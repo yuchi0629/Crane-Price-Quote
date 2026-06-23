@@ -214,6 +214,7 @@ def default_database():
         "forms_by_code": {},
         "components_by_model": {},
         "config_exports_by_model": {},
+        "deleted_config_model_keys": [],
         "options_by_code": {},
         "change_log": [],
     }
@@ -781,6 +782,9 @@ def import_tower_config_file(path, model_name=None):
 
     db = load_database()
     model_key = normalize_key(model_name)
+    db["deleted_config_model_keys"] = [
+        key for key in db.get("deleted_config_model_keys", []) if normalize_key(key) != model_key
+    ]
     old_sources = []
     for key, cfg in list(db["components_by_model"].items()):
         if cfg.get("model_key") == model_key or normalize_key(key) == model_key:
@@ -827,6 +831,9 @@ def delete_tower_config(model_name):
             del db["config_exports_by_model"][key]
 
     if removed_sources:
+        deleted_keys = {normalize_key(key) for key in db.get("deleted_config_model_keys", []) if clean_text(key)}
+        deleted_keys.add(model_key)
+        db["deleted_config_model_keys"] = sorted(deleted_keys)
         save_database(db)
     return sorted(set(removed_sources)), sorted(removed_forms)
 
@@ -903,12 +910,19 @@ def find_component_config(db, model_name):
     return {}
 
 
+def is_config_deleted(db, model_name):
+    model_key = normalize_key(model_name)
+    return any(normalize_key(key) == model_key for key in db.get("deleted_config_model_keys", []))
+
+
 def has_imported_config(db, model_name):
-    return bool(find_component_config(db, model_name) or find_export_config(db, model_name) or find_initial_export_config(model_name))
+    if is_config_deleted(db, model_name):
+        return False
+    return bool(find_component_config(db, model_name) or find_export_config(db, model_name))
 
 
 def find_initial_export_config(model_name):
-    if not INITIAL_DB_FILE.exists() or INITIAL_DB_FILE == DB_FILE:
+    if DB_FILE.exists() or not INITIAL_DB_FILE.exists() or INITIAL_DB_FILE == DB_FILE:
         return {}
     try:
         with INITIAL_DB_FILE.open("r", encoding="utf-8") as f:
