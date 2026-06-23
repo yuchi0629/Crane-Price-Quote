@@ -632,7 +632,18 @@ def option_config_items(db, model_name, install_form):
     has_climbing = False
     has_collector = False
     for row in rows:
-        text = " ".join([row.get("composition", ""), row.get("component", ""), row.get("name", ""), row.get("row_text", "")])
+        text = " ".join(
+            [
+                row.get("composition", ""),
+                row.get("component", ""),
+                row.get("name", ""),
+                row.get("code", ""),
+                row.get("model_code", ""),
+                row.get("row_text", ""),
+            ]
+        )
+        if "电源箱总成" in text:
+            continue
         if "爬升" in text:
             has_climbing = True
             continue
@@ -1430,7 +1441,17 @@ class QuotationApp:
         self.option_qty_vars = []
         self.option_type_vars = []
         self.config_option_items = []
+        self.term_defaults = {
+            "payment": "合同签订后支付30%作为定金，发货前付清剩余70%合同款。",
+            "delivery": "收到定金后90日内发货。",
+            "validity": "30天",
+            "transportation": "以最终发运方案为准。",
+            "warranty": "自提单之日起保修期：钢结构12个月；机构12个月；电气部件12个月。易损件除外。",
+            "others": "报价含首次安装指导服务费用。",
+        }
+        self.term_values = dict(self.term_defaults)
         self.term_widgets = {}
+        self.quote_dialog = None
         self.research_operator_id = ""
         self.research_operation_time = ""
         self.build_ui()
@@ -1447,72 +1468,26 @@ class QuotationApp:
         toolbar = ttk.Frame(main)
         toolbar.pack(fill="x", pady=(10, 8))
         ttk.Button(toolbar, text="生成报价 PDF", command=self.on_generate).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(toolbar, text="报价单信息", command=self.open_quote_info_dialog).pack(side=LEFT, padx=(0, 8))
 
         settings_row = ttk.Frame(main)
         settings_row.pack(fill="x")
-        quote_info = ttk.LabelFrame(settings_row, text="报价单信息", padding=10, style="Title.TLabelframe")
-        quote_info.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
-        product_info = ttk.LabelFrame(settings_row, text="产品信息", padding=10, style="Title.TLabelframe")
-        product_info.pack(side=LEFT, fill="both", expand=True)
+        product_select = ttk.LabelFrame(settings_row, text="产品型号选择", padding=10, style="Title.TLabelframe")
+        product_select.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
+        info_box = ttk.LabelFrame(settings_row, text="产品基本信息", padding=10, style="Title.TLabelframe")
+        info_box.pack(side=LEFT, fill="both", expand=True)
 
-        self.language_combo = ttk.Combobox(quote_info, textvariable=self.language_label, values=list(LANG_OPTIONS), width=12, state="readonly")
-        self.term_combo = ttk.Combobox(quote_info, textvariable=self.trade_term, values=["FOB", "CIF", "EXZ", "DDP", "DAP"], width=10, state="readonly")
-        self.currency_combo = ttk.Combobox(quote_info, textvariable=self.currency, values=["CNY", "USD", "EUR"], width=10, state="readonly")
-        quote_fields = [
-            ("报价单语言", self.language_combo, 0, 0),
-            ("报价日期", ttk.Entry(quote_info, textvariable=self.date_var, width=14), 0, 2),
-            ("贸易术语", self.term_combo, 0, 4),
-            ("交易地点", ttk.Entry(quote_info, textvariable=self.trade_place, width=18), 0, 6),
-            ("价格", ttk.Entry(quote_info, textvariable=self.price, width=14), 1, 0),
-            ("价格单位", self.currency_combo, 1, 2),
-            ("报价单位", ttk.Entry(quote_info, textvariable=self.quote_company, width=38), 1, 4),
-            ("报价人", ttk.Entry(quote_info, textvariable=self.quote_person, width=14), 2, 0),
-            ("联系电话", ttk.Entry(quote_info, textvariable=self.quote_phone, width=18), 2, 2),
-            ("联系邮箱", ttk.Entry(quote_info, textvariable=self.quote_email, width=30), 3, 0),
-            ("公司地址", ttk.Entry(quote_info, textvariable=self.header_address, width=64), 4, 0),
-        ]
-        for label_text, widget, row, col in quote_fields:
-            ttk.Label(quote_info, text=label_text).grid(row=row, column=col, sticky="w", padx=(0, 4), pady=3)
-            span = 7 if label_text in ("公司地址", "联系邮箱") else (3 if label_text == "报价单位" else 1)
-            widget.grid(row=row, column=col + 1, columnspan=span, sticky="we", padx=(0, 10), pady=3)
-        quote_info.columnconfigure(7, weight=1)
-
-        self.model_combo = ttk.Combobox(product_info, textvariable=self.model_var, width=28, state="readonly")
-        self.form_combo = ttk.Combobox(product_info, textvariable=self.form_var, width=24, state="readonly")
-        ttk.Label(product_info, text="产品型号").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=4)
+        self.model_combo = ttk.Combobox(product_select, textvariable=self.model_var, width=28, state="readonly")
+        self.form_combo = ttk.Combobox(product_select, textvariable=self.form_var, width=24, state="readonly")
+        ttk.Label(product_select, text="产品型号").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=4)
         self.model_combo.grid(row=0, column=1, sticky="we", pady=4)
-        ttk.Label(product_info, text="安装形式").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=4)
+        ttk.Label(product_select, text="安装形式").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=4)
         self.form_combo.grid(row=1, column=1, sticky="we", pady=4)
-        product_info.columnconfigure(1, weight=1)
+        product_select.columnconfigure(1, weight=1)
+        self.info_label = ttk.Label(info_box, text="", justify=LEFT)
+        self.info_label.pack(anchor="nw")
         self.model_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_forms())
         self.form_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_screen())
-
-        terms = ttk.LabelFrame(main, text="交易条款及其他信息", padding=10, style="Title.TLabelframe")
-        terms.pack(fill="x", pady=(10, 0))
-        defaults = {
-            "payment": "合同签订后支付30%作为定金，发货前付清剩余70%合同款。",
-            "delivery": "收到定金后90日内发货。",
-            "validity": "30天",
-            "transportation": "以最终发运方案为准。",
-            "warranty": "自提单之日起保修期：钢结构12个月；机构12个月；电气部件12个月。易损件除外。",
-            "others": "报价含首次安装指导服务费用。",
-        }
-        term_labels = [
-            ("payment", "付款方式"),
-            ("delivery", "交货期"),
-            ("validity", "报价有效期"),
-            ("transportation", "运输方案"),
-            ("warranty", "质保期"),
-            ("others", "其他"),
-        ]
-        for idx, (key, text) in enumerate(term_labels):
-            row = idx // 3
-            col = (idx % 3) * 2
-            ttk.Label(terms, text=text).grid(row=row, column=col, sticky="nw", padx=(0, 4), pady=4)
-            widget = Text(terms, width=34, height=2, wrap="word")
-            widget.insert("1.0", defaults[key])
-            widget.grid(row=row, column=col + 1, sticky="we", padx=(0, 12), pady=4)
-            self.term_widgets[key] = widget
 
         body = ttk.PanedWindow(main, orient="horizontal")
         body.pack(fill=BOTH, expand=True, pady=10)
@@ -1520,11 +1495,6 @@ class QuotationApp:
         right = ttk.Frame(body)
         body.add(left, weight=1)
         body.add(right, weight=2)
-
-        info_box = ttk.LabelFrame(left, text="产品基本信息", padding=10, style="Title.TLabelframe")
-        info_box.pack(fill="x", pady=(0, 8))
-        self.info_label = ttk.Label(info_box, text="", justify=LEFT)
-        self.info_label.pack(anchor="nw")
 
         basic_config_box = ttk.LabelFrame(left, text="产品基本配置", padding=10, style="Title.TLabelframe")
         basic_config_box.pack(fill=BOTH, expand=True)
@@ -1550,7 +1520,7 @@ class QuotationApp:
         self.basic_config_tree.pack(side=LEFT, fill=BOTH, expand=True)
         basic_scroll.pack(side=RIGHT, fill="y")
 
-        option_box = ttk.LabelFrame(right, text="可选增减配置（报价单不显示价格）", padding=10, style="Title.TLabelframe")
+        option_box = ttk.LabelFrame(right, text="可选增减配置", padding=10, style="Title.TLabelframe")
         option_box.pack(fill=BOTH, expand=True)
         self.option_frame = ScrollableFrame(option_box)
         self.option_frame.pack(fill=BOTH, expand=True)
@@ -1561,6 +1531,93 @@ class QuotationApp:
         ttk.Button(bottom_bar, text="查看机型配置表导入状态", command=self.show_config_status).pack(side=LEFT, padx=(0, 8))
         ttk.Button(bottom_bar, text="配置导入修改记录", command=self.show_change_log).pack(side=LEFT, padx=(0, 8))
         ttk.Button(bottom_bar, text="打开输出文件夹", command=lambda: os.startfile(OUTPUT_DIR)).pack(side=LEFT)
+
+    def term_labels(self):
+        return [
+            ("payment", "付款方式"),
+            ("delivery", "交货期"),
+            ("validity", "报价有效期"),
+            ("transportation", "运输方案"),
+            ("warranty", "质保期"),
+            ("others", "其他"),
+        ]
+
+    def sync_quote_dialog_values(self):
+        live_widgets = {}
+        for key, widget in self.term_widgets.items():
+            if widget.winfo_exists():
+                self.term_values[key] = widget.get("1.0", "end").strip()
+                live_widgets[key] = widget
+        self.term_widgets = live_widgets
+
+    def open_quote_info_dialog(self):
+        if self.quote_dialog is not None and self.quote_dialog.winfo_exists():
+            self.quote_dialog.lift()
+            self.quote_dialog.focus_force()
+            return
+
+        dialog = Toplevel(self.root)
+        self.quote_dialog = dialog
+        dialog.title("报价单信息")
+        dialog.geometry("980x520")
+        dialog.transient(self.root)
+
+        wrapper = ttk.Frame(dialog, padding=12)
+        wrapper.pack(fill=BOTH, expand=True)
+
+        quote_info = ttk.LabelFrame(wrapper, text="报价单信息", padding=10, style="Title.TLabelframe")
+        quote_info.pack(fill="x")
+        self.language_combo = ttk.Combobox(quote_info, textvariable=self.language_label, values=list(LANG_OPTIONS), width=12, state="readonly")
+        self.term_combo = ttk.Combobox(quote_info, textvariable=self.trade_term, values=["FOB", "CIF", "EXZ", "DDP", "DAP"], width=10, state="readonly")
+        self.currency_combo = ttk.Combobox(quote_info, textvariable=self.currency, values=["CNY", "USD", "EUR"], width=10, state="readonly")
+        quote_fields = [
+            ("报价单语言", self.language_combo, 0, 0),
+            ("报价日期", ttk.Entry(quote_info, textvariable=self.date_var, width=14), 0, 2),
+            ("贸易术语", self.term_combo, 0, 4),
+            ("交易地点", ttk.Entry(quote_info, textvariable=self.trade_place, width=18), 0, 6),
+            ("价格", ttk.Entry(quote_info, textvariable=self.price, width=14), 1, 0),
+            ("价格单位", self.currency_combo, 1, 2),
+            ("报价单位", ttk.Entry(quote_info, textvariable=self.quote_company, width=38), 1, 4),
+            ("报价人", ttk.Entry(quote_info, textvariable=self.quote_person, width=14), 2, 0),
+            ("联系电话", ttk.Entry(quote_info, textvariable=self.quote_phone, width=18), 2, 2),
+            ("联系邮箱", ttk.Entry(quote_info, textvariable=self.quote_email, width=30), 3, 0),
+            ("公司地址", ttk.Entry(quote_info, textvariable=self.header_address, width=64), 4, 0),
+        ]
+        for label_text, widget, row, col in quote_fields:
+            ttk.Label(quote_info, text=label_text).grid(row=row, column=col, sticky="w", padx=(0, 4), pady=3)
+            span = 7 if label_text in ("公司地址", "联系邮箱") else (3 if label_text == "报价单位" else 1)
+            widget.grid(row=row, column=col + 1, columnspan=span, sticky="we", padx=(0, 10), pady=3)
+        quote_info.columnconfigure(7, weight=1)
+
+        terms = ttk.LabelFrame(wrapper, text="交易条款及其他信息", padding=10, style="Title.TLabelframe")
+        terms.pack(fill=BOTH, expand=True, pady=(10, 0))
+        self.term_widgets = {}
+        for idx, (key, text) in enumerate(self.term_labels()):
+            row = idx // 2
+            col = (idx % 2) * 2
+            ttk.Label(terms, text=text).grid(row=row, column=col, sticky="nw", padx=(0, 4), pady=5)
+            widget = Text(terms, width=42, height=3, wrap="word")
+            widget.insert("1.0", self.term_values.get(key, self.term_defaults.get(key, "")))
+            widget.grid(row=row, column=col + 1, sticky="nsew", padx=(0, 12), pady=5)
+            self.term_widgets[key] = widget
+        for col in (1, 3):
+            terms.columnconfigure(col, weight=1)
+        for row in range(3):
+            terms.rowconfigure(row, weight=1)
+
+        button_bar = ttk.Frame(wrapper)
+        button_bar.pack(fill="x", pady=(10, 0))
+        ttk.Button(button_bar, text="确定", command=lambda: self.close_quote_info_dialog(dialog)).pack(side=RIGHT)
+
+        dialog.protocol("WM_DELETE_WINDOW", lambda: self.close_quote_info_dialog(dialog))
+
+    def close_quote_info_dialog(self, dialog):
+        self.sync_quote_dialog_values()
+        self.save_current_user_settings()
+        if dialog.winfo_exists():
+            dialog.destroy()
+        self.quote_dialog = None
+        self.term_widgets = {}
 
     def current_product(self):
         return self.db.get("products", {}).get(self.model_var.get(), {})
@@ -1946,7 +2003,10 @@ class QuotationApp:
         scrollbar.pack(side=RIGHT, fill="y")
 
     def term_value(self, key):
-        return self.term_widgets[key].get("1.0", "end").strip()
+        widget = self.term_widgets.get(key)
+        if widget is not None and widget.winfo_exists():
+            return widget.get("1.0", "end").strip()
+        return self.term_values.get(key, self.term_defaults.get(key, ""))
 
     def save_current_user_settings(self):
         save_user_settings(
@@ -1960,6 +2020,7 @@ class QuotationApp:
         )
 
     def build_quote(self):
+        self.sync_quote_dialog_values()
         selected_items = []
         for idx, var in enumerate(self.option_vars):
             if not var.get() or idx >= len(self.config_option_items):
@@ -2037,6 +2098,7 @@ class QuotationApp:
             )
 
     def on_close(self):
+        self.sync_quote_dialog_values()
         self.save_current_user_settings()
         self.root.destroy()
 
