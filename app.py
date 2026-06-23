@@ -251,10 +251,10 @@ def append_change_log(operator_id, operation_time, content):
 def default_user_settings():
     return {
         "header_address": "Zoomlion Smart City Headquarters Building, No.613 NaqiuRoad, WangCheng District, Changsha, Hunan, China",
-        "quote_company": "中联重科建筑起重机械公司",
+        "quote_company": "中联重科建筑起重机械有限公司",
         "quote_person": "Lewis",
         "quote_phone": "+86 123456789",
-        "quote_email": "",
+        "quote_email": "Lewisliu@zoomlion.com",
     }
 
 
@@ -269,6 +269,10 @@ def load_user_settings():
                 settings.update({key: clean_text(value) for key, value in saved.items() if key in settings})
         except Exception:
             pass
+    if settings.get("quote_company") == "中联重科建筑起重机械公司":
+        settings["quote_company"] = "中联重科建筑起重机械有限公司"
+    if not settings.get("quote_email"):
+        settings["quote_email"] = "Lewisliu@zoomlion.com"
     return settings
 
 
@@ -284,6 +288,14 @@ def clean_text(value):
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value).strip()
+
+
+def clean_config_text(value):
+    return clean_text(value).replace("图", "")
+
+
+def code_or_slash(value):
+    return clean_text(value) or "/"
 
 
 def normalize_key(value):
@@ -610,13 +622,13 @@ def config_rows_for_form(db, model_name, install_form):
         mark = clean_text(ws.cell(row_idx, form_col).value)
         rows.append(
             {
-                "composition": cell_value_with_merge(ws, row_idx, comp_col) if comp_col else "",
-                "component": cell_value_with_merge(ws, row_idx, part_col) if part_col else "",
-                "name": cell_value_with_merge(ws, row_idx, name_col) if name_col else "",
-                "code": cell_value_with_merge(ws, row_idx, code_col) if code_col else "",
-                "model_code": cell_value_with_merge(ws, row_idx, model_code_col) if model_code_col else "",
-                "mark": mark,
-                "row_text": full_row_text,
+                "composition": clean_config_text(cell_value_with_merge(ws, row_idx, comp_col)) if comp_col else "",
+                "component": clean_config_text(cell_value_with_merge(ws, row_idx, part_col)) if part_col else "",
+                "name": clean_config_text(cell_value_with_merge(ws, row_idx, name_col)) if name_col else "",
+                "code": clean_config_text(cell_value_with_merge(ws, row_idx, code_col)) if code_col else "",
+                "model_code": clean_config_text(cell_value_with_merge(ws, row_idx, model_code_col)) if model_code_col else "",
+                "mark": clean_config_text(mark),
+                "row_text": clean_config_text(full_row_text),
             }
         )
     return rows
@@ -646,17 +658,17 @@ def option_config_items(db, model_name, install_form):
             continue
         if "爬升" in text:
             child = dict(row)
-            child["item_display"] = "、".join(value for value in [child.get("component", ""), child.get("name", ""), child.get("model_code", "")] if value)
+            child["item_display"] = "、".join([child.get("component", ""), child.get("name", ""), code_or_slash(child.get("model_code", ""))])
             climbing_items.append(child)
             continue
         if "中央集电环" in text:
             child = dict(row)
-            child["item_display"] = "、".join(value for value in [child.get("component", ""), child.get("name", ""), child.get("model_code", "")] if value)
+            child["item_display"] = "、".join([child.get("component", ""), child.get("name", ""), code_or_slash(child.get("model_code", ""))])
             collector_items.append(child)
             continue
         if "○" in row.get("mark", "") or any(keyword in row.get("row_text", "") for keyword in EXPORT_OPTION_KEYWORDS):
             item = dict(row)
-            item["item_display"] = "、".join(value for value in [item.get("component", ""), item.get("name", ""), item.get("model_code", "")] if value)
+            item["item_display"] = "、".join([item.get("component", ""), item.get("name", ""), code_or_slash(item.get("model_code", ""))])
             items.append(item)
     if climbing_items:
         items.append({"composition": "爬升", "component": "爬升包", "name": "爬升包", "code": "", "model_code": "", "mark": "○", "item_display": "爬升包", "children": climbing_items})
@@ -1290,7 +1302,7 @@ def make_pdf(db, quote, output_path):
                 [
                     clean_text(idx),
                     make_paragraph(display, left),
-                    make_paragraph(tr_text(item.get("code", ""), lang), left),
+                    make_paragraph(tr_text(code_or_slash(item.get("code", "")), lang), left),
                     make_paragraph(item.get("quantity", "1"), center),
                 ]
             )
@@ -1317,7 +1329,7 @@ def make_pdf(db, quote, output_path):
                 [
                     clean_text(idx),
                     make_paragraph(tr_text(item.get("change_type", "增配"), lang), center),
-                    make_paragraph(tr_text(item.get("model_code", "") or item.get("code", ""), lang), left),
+                    make_paragraph(tr_text(code_or_slash(item.get("model_code", "") or item.get("code", "")), lang), left),
                     make_paragraph(tr_text(item.get("item_display", "") or item.get("name", ""), lang), left),
                     make_paragraph(qty, center),
                 ]
@@ -1415,7 +1427,7 @@ def make_ltc_option_pdf(quote, output_path):
             make_paragraph(ltc_text(item.get("component", "")), left),
             make_paragraph(ltc_text(item.get("name", "")), left),
             make_paragraph(ltc_text(item.get("code", "")), left),
-            make_paragraph(ltc_text(item.get("model_code", "")), left),
+            make_paragraph(ltc_text(code_or_slash(item.get("model_code", ""))), left),
             make_paragraph(clean_text(item.get("quantity", "")) or "1", center),
         ])
     table = Table(rows, colWidths=[8 * mm, 16 * mm, 31 * mm, 40 * mm, 34 * mm, 31 * mm, 13 * mm], repeatRows=1)
@@ -1799,7 +1811,7 @@ class QuotationApp:
                     idx,
                     item.get("component", ""),
                     item.get("name", ""),
-                    item.get("model_code", ""),
+                    code_or_slash(item.get("model_code", "")),
                     item.get("mark", ""),
                 ),
             )
