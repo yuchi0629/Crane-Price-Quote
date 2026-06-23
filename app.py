@@ -808,6 +808,29 @@ def import_tower_config_file(path, model_name=None):
     return model_name, sum(len(items) for items in components_by_form.values()), old_sources
 
 
+def delete_tower_config(model_name):
+    db = load_database()
+    model_key = normalize_key(model_name)
+    removed_sources = []
+    removed_forms = set()
+
+    for key, cfg in list(db.get("components_by_model", {}).items()):
+        if cfg.get("model_key") == model_key or normalize_key(key) == model_key:
+            removed_sources.append(clean_text(cfg.get("source_file")) or key)
+            removed_forms.update(clean_text(form) for form in cfg.get("forms", {}) if clean_text(form))
+            del db["components_by_model"][key]
+
+    for key, cfg in list(db.get("config_exports_by_model", {}).items()):
+        if cfg.get("model_key") == model_key or normalize_key(key) == model_key:
+            removed_sources.append(clean_text(cfg.get("source_file")) or key)
+            removed_forms.update(clean_text(form) for form in cfg.get("forms", {}) if clean_text(form))
+            del db["config_exports_by_model"][key]
+
+    if removed_sources:
+        save_database(db)
+    return sorted(set(removed_sources)), sorted(removed_forms)
+
+
 def register_fonts():
     for name, path in [
         ("AppFont", r"C:\Windows\Fonts\ARIALUNI.ttf"),
@@ -1888,7 +1911,7 @@ class QuotationApp:
     def show_research_import_window(self):
         window = Toplevel(self.root)
         window.title("研发配置导入模块")
-        window.geometry("520x220")
+        window.geometry("520x260")
         window.transient(self.root)
         frame = ttk.Frame(window, padding=16)
         frame.pack(fill=BOTH, expand=True)
@@ -1898,6 +1921,7 @@ class QuotationApp:
         ttk.Button(frame, text="导入增减配价格表", command=self.on_import_price).pack(fill="x", pady=4)
         ttk.Button(frame, text="导入产品安装参数表", command=self.on_import_product_cfg).pack(fill="x", pady=4)
         ttk.Button(frame, text="导入当前机型配置表", command=self.on_import_tower_config).pack(fill="x", pady=4)
+        ttk.Button(frame, text="删除机型配置表", command=self.on_delete_tower_config).pack(fill="x", pady=4)
 
     def record_change(self, content):
         append_change_log(self.research_operator_id, self.research_operation_time, content)
@@ -1963,6 +1987,53 @@ class QuotationApp:
         buttons = ttk.Frame(frame)
         buttons.pack(fill="x")
         ttk.Button(buttons, text="下一步：选择配置表文件", command=choose_file).pack(side=LEFT)
+        ttk.Button(buttons, text="取消", command=dialog.destroy).pack(side=LEFT, padx=(8, 0))
+
+    def on_delete_tower_config(self):
+        configs = {}
+        for cfg in list(self.db.get("components_by_model", {}).values()) + list(self.db.get("config_exports_by_model", {}).values()):
+            model = clean_text(cfg.get("model")) or clean_text(cfg.get("source_file"))
+            if model:
+                configs[normalize_key(model)] = model
+        models = sorted(configs.values())
+        if not models:
+            messagebox.showinfo("没有配置表", "当前数据库里没有已导入的机型配置表。")
+            return
+
+        dialog = Toplevel(self.root)
+        dialog.title("删除机型配置表")
+        dialog.geometry("440x170")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        frame = ttk.Frame(dialog, padding=14)
+        frame.pack(fill=BOTH, expand=True)
+        ttk.Label(frame, text="请选择要删除配置表的产品型号：").pack(anchor="w")
+        selected_model = StringVar(value=self.model_var.get() if self.model_var.get() in models else models[0])
+        combo = ttk.Combobox(frame, textvariable=selected_model, values=models, state="readonly", width=40)
+        combo.pack(fill="x", pady=(8, 10))
+        ttk.Label(frame, text="只删除该机型配置表，不删除产品型号、安装参数和增减配价格数据。", foreground="#555").pack(anchor="w")
+
+        def delete_selected():
+            model_name = selected_model.get()
+            if not messagebox.askyesno("确认删除", f"确认删除 {model_name} 的配置表吗？", parent=dialog):
+                return
+            try:
+                sources, forms = delete_tower_config(model_name)
+                if not sources:
+                    messagebox.showinfo("未删除", f"{model_name} 没有找到可删除的配置表。", parent=dialog)
+                    return
+                self.record_change(
+                    f"删除机型配置表：{model_name}；删除文件：{'、'.join(sources)}；安装形式：{'、'.join(forms) if forms else '无'}。"
+                )
+                dialog.destroy()
+                self.reload_db()
+                messagebox.showinfo("删除完成", f"已删除 {model_name} 的配置表。")
+            except Exception as exc:
+                messagebox.showerror("删除失败", str(exc), parent=dialog)
+
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(12, 0))
+        ttk.Button(buttons, text="删除", command=delete_selected).pack(side=LEFT)
         ttk.Button(buttons, text="取消", command=dialog.destroy).pack(side=LEFT, padx=(8, 0))
 
     def show_config_status(self):
