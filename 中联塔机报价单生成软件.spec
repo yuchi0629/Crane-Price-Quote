@@ -5,7 +5,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('data\\quotation_database.json', 'data')],
+    datas=[('data\\quotation_database.json', 'data'), ('assets\\zoomlion.ico', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

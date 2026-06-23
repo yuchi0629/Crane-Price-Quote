@@ -34,6 +34,7 @@ else:
 DB_FILE = DATA_DIR / "quotation_database.json"
 SETTINGS_FILE = DATA_DIR / "user_settings.json"
 INITIAL_DB_FILE = BUNDLE_DIR / "data" / "quotation_database.json"
+WINDOW_ICON_FILE = BUNDLE_DIR / "assets" / "zoomlion.ico"
 EMBEDDED_LOGO_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAGwAAAAfCAYAAAAC0CiiAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8"
     "YQUAAAAJcEhZcwAADsQAAA7EAZUrDhsAAANKSURBVGhD7ZoxSBtRGMf/7WQLBUsKUWgiImZwEMngECxdQ"
@@ -1454,6 +1455,7 @@ class QuotationApp:
     def __init__(self, root):
         self.root = root
         self.root.title("中联塔机报价单生成软件")
+        self.set_window_icon()
         self.root.geometry("1180x760")
         ensure_dirs()
         self.db = load_database()
@@ -1493,6 +1495,13 @@ class QuotationApp:
         self.build_ui()
         self.refresh_models()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def set_window_icon(self):
+        try:
+            if WINDOW_ICON_FILE.exists():
+                self.root.iconbitmap(default=str(WINDOW_ICON_FILE))
+        except Exception:
+            pass
 
     def build_ui(self):
         style = ttk.Style(self.root)
