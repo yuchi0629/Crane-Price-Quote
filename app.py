@@ -547,6 +547,109 @@ def row_values(ws, row_idx, columns):
     return [clean_text(ws.cell(row_idx, col).value) for col in columns]
 
 
+def cell_value_with_merge(ws, row_idx, col_idx):
+    value = ws.cell(row_idx, col_idx).value
+    if value is not None:
+        return clean_text(value)
+    for merged in ws.merged_cells.ranges:
+        if merged.min_row <= row_idx <= merged.max_row and merged.min_col <= col_idx <= merged.max_col:
+            return clean_text(ws.cell(merged.min_row, merged.min_col).value)
+    return ""
+
+
+def find_header_column(ws, form_row, keywords):
+    for col in range(1, ws.max_column + 1):
+        header_text = re.sub(r"\s+", "", column_header_text(ws, col, form_row))
+        if any(keyword in header_text for keyword in keywords):
+            return col
+    return None
+
+
+def workbook_bytes_for_model(db, model_name):
+    for cfg in [find_export_config(db, model_name), find_component_config(db, model_name), find_initial_export_config(model_name)]:
+        workbook_base64 = clean_text(cfg.get("workbook_base64", "")) if cfg else ""
+        if workbook_base64:
+            return base64.b64decode(workbook_base64)
+        source_path = find_source_workbook_path(cfg.get("source_file", "")) if cfg else None
+        if source_path:
+            return source_path.read_bytes()
+    return None
+
+
+def config_rows_for_form(db, model_name, install_form):
+    workbook_bytes = workbook_bytes_for_model(db, model_name)
+    if not workbook_bytes:
+        db, _cfg = ensure_export_config(db, model_name)
+        workbook_bytes = workbook_bytes_for_model(db, model_name)
+    if not workbook_bytes:
+        raise ValueError("当前机型没有可读取的配置表原始数据。")
+
+    wb = load_workbook(BytesIO(workbook_bytes), data_only=True)
+    ws = wb.active
+    form_row, form_columns = find_config_form_columns(ws)
+    form_key = normalize_form(install_form)
+    form_col = form_columns.get(form_key)
+    if not form_col:
+        for saved_form, col in form_columns.items():
+            if saved_form in form_key or form_key in saved_form:
+                form_col = col
+                break
+    if not form_col:
+        raise ValueError("当前安装形式没有匹配到配置表列。")
+
+    comp_col = find_header_column(ws, form_row, ["组成"])
+    part_col = find_header_column(ws, form_row, ["部件"])
+    name_col = find_header_column(ws, form_row, ["名称"])
+    code_col = find_header_column(ws, form_row, ["编码"])
+    model_code_col = find_header_column(ws, form_row, ["代号"])
+    rows = []
+    for row_idx in range(form_row + 1, ws.max_row + 1):
+        full_row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
+        if not full_row_text:
+            continue
+        mark = clean_text(ws.cell(row_idx, form_col).value)
+        rows.append(
+            {
+                "composition": cell_value_with_merge(ws, row_idx, comp_col) if comp_col else "",
+                "component": cell_value_with_merge(ws, row_idx, part_col) if part_col else "",
+                "name": cell_value_with_merge(ws, row_idx, name_col) if name_col else "",
+                "code": cell_value_with_merge(ws, row_idx, code_col) if code_col else "",
+                "model_code": cell_value_with_merge(ws, row_idx, model_code_col) if model_code_col else "",
+                "mark": mark,
+                "row_text": full_row_text,
+            }
+        )
+    return rows
+
+
+def basic_config_items(db, model_name, install_form):
+    return [row for row in config_rows_for_form(db, model_name, install_form) if "●" in row.get("mark", "")]
+
+
+def option_config_items(db, model_name, install_form):
+    rows = config_rows_for_form(db, model_name, install_form)
+    items = []
+    has_climbing = False
+    has_collector = False
+    for row in rows:
+        text = " ".join([row.get("composition", ""), row.get("component", ""), row.get("name", ""), row.get("row_text", "")])
+        if "爬升" in text:
+            has_climbing = True
+            continue
+        if "中央集电环" in text:
+            has_collector = True
+            continue
+        if "○" in row.get("mark", "") or any(keyword in row.get("row_text", "") for keyword in EXPORT_OPTION_KEYWORDS):
+            item = dict(row)
+            item["item_display"] = "、".join(value for value in [item.get("component", ""), item.get("name", ""), item.get("model_code", "")] if value)
+            items.append(item)
+    if has_climbing:
+        items.append({"composition": "爬升", "component": "爬升包", "name": "爬升包", "code": "", "model_code": "", "mark": "○", "item_display": "爬升包"})
+    if has_collector:
+        items.append({"composition": "中央集电环", "component": "中央集电环包", "name": "中央集电环包", "code": "", "model_code": "", "mark": "○", "item_display": "中央集电环包"})
+    return items
+
+
 def export_merge_ranges(ws, source_rows, columns):
     row_map = {row_idx: export_idx for export_idx, row_idx in enumerate(source_rows, start=1)}
     col_map = {col_idx: export_idx for export_idx, col_idx in enumerate(columns, start=1)}
@@ -1057,6 +1160,7 @@ class QuoteInput:
     others: str
     selected_option_indexes: list
     selected_option_quantities: dict
+    selected_option_items: list
 
 
 def make_pdf(db, quote, output_path):
@@ -1090,8 +1194,7 @@ def make_pdf(db, quote, output_path):
     form = next((item for item in forms if normalize_form(item.get("install_form")) == normalize_form(quote.install_form)), {})
     tower_type = product.get("tower_type") or detect_tower_type(quote.model_name)
     max_load = product.get("max_load") or detect_max_load(quote.model_name)
-    options = db.get("options_by_code", {}).get(product_code, [])
-    selected_options = [(i, options[i]) for i in quote.selected_option_indexes if i < len(options)]
+    selected_options = quote.selected_option_items or []
     components = select_components(db, quote.model_name, quote.install_form)
 
     story = []
@@ -1189,14 +1292,14 @@ def make_pdf(db, quote, output_path):
         ]
     )
     if selected_options:
-        for idx, (option_index, item) in enumerate(selected_options, start=1):
-            qty = quote.selected_option_quantities.get(str(option_index), "1")
+        for idx, item in enumerate(selected_options, start=1):
+            qty = clean_text(item.get("quantity", "")) or "1"
             option_rows.append(
                 [
                     clean_text(idx),
-                    make_paragraph(change_type_text(item, lang), center),
-                    make_paragraph(tr_text(item.get("part_code", ""), lang), left),
-                    make_paragraph(tr_text(item.get("part_name", ""), lang), left),
+                    make_paragraph(tr_text(item.get("change_type", "增配"), lang), center),
+                    make_paragraph(tr_text(item.get("model_code", "") or item.get("code", ""), lang), left),
+                    make_paragraph(tr_text(item.get("item_display", "") or item.get("name", ""), lang), left),
                     make_paragraph(qty, center),
                 ]
             )
@@ -1238,6 +1341,56 @@ def table_style(spans=None):
     return TableStyle(commands)
 
 
+def make_ltc_option_pdf(quote, output_path):
+    ensure_dirs()
+    font_name = register_fonts()
+    styles = getSampleStyleSheet()
+    normal = ParagraphStyle("normal", parent=styles["Normal"], fontName=font_name, fontSize=8, leading=9.5)
+    title_style = ParagraphStyle("title", parent=normal, alignment=TA_CENTER, fontSize=16, leading=20)
+    center = ParagraphStyle("center", parent=normal, alignment=TA_CENTER)
+    left = ParagraphStyle("left", parent=normal, alignment=TA_LEFT)
+
+    doc = BaseDocTemplate(
+        str(output_path),
+        pagesize=A4,
+        leftMargin=14 * mm,
+        rightMargin=14 * mm,
+        topMargin=12 * mm,
+        bottomMargin=10 * mm,
+    )
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="normal")
+    doc.addPageTemplates([PageTemplate(id="ltc", frames=[frame])])
+    story = [
+        Paragraph("LTC选配指导文件", title_style),
+        Paragraph(f"产品型号：{quote.model_name}　安装形式：{quote.install_form}　日期：{quote.quote_date}", normal),
+    ]
+    rows = [[
+        make_paragraph("No.", center),
+        make_paragraph("增减配", center),
+        make_paragraph("组成", center),
+        make_paragraph("部件", center),
+        make_paragraph("名称", center),
+        make_paragraph("编码", center),
+        make_paragraph("代号", center),
+        make_paragraph("数量", center),
+    ]]
+    for idx, item in enumerate(quote.selected_option_items or [], start=1):
+        rows.append([
+            clean_text(idx),
+            make_paragraph(item.get("change_type", "增配"), center),
+            make_paragraph(item.get("composition", ""), left),
+            make_paragraph(item.get("component", ""), left),
+            make_paragraph(item.get("name", ""), left),
+            make_paragraph(item.get("code", ""), left),
+            make_paragraph(item.get("model_code", ""), left),
+            make_paragraph(clean_text(item.get("quantity", "")) or "1", center),
+        ])
+    table = Table(rows, colWidths=[9 * mm, 17 * mm, 27 * mm, 28 * mm, 42 * mm, 35 * mm, 30 * mm, 13 * mm], repeatRows=1)
+    table.setStyle(table_style())
+    story.append(table)
+    doc.build(story)
+
+
 class ScrollableFrame(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
@@ -1275,6 +1428,8 @@ class QuotationApp:
         self.quote_email = StringVar(value=self.user_settings["quote_email"])
         self.option_vars = []
         self.option_qty_vars = []
+        self.option_type_vars = []
+        self.config_option_items = []
         self.term_widgets = {}
         self.research_operator_id = ""
         self.research_operation_time = ""
@@ -1283,6 +1438,8 @@ class QuotationApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def build_ui(self):
+        style = ttk.Style(self.root)
+        style.configure("Title.TLabelframe.Label", font=("Microsoft YaHei UI", 11, "bold"))
         main = ttk.Frame(self.root, padding=12)
         main.pack(fill=BOTH, expand=True)
         ttk.Label(main, text="中联塔机报价单生成软件", font=("Microsoft YaHei UI", 18, "bold")).pack(anchor="w")
@@ -1290,15 +1447,12 @@ class QuotationApp:
         toolbar = ttk.Frame(main)
         toolbar.pack(fill="x", pady=(10, 8))
         ttk.Button(toolbar, text="生成报价 PDF", command=self.on_generate).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(toolbar, text="生成基本配置清单", command=lambda: self.on_generate_config_list("basic")).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(toolbar, text="生成增减配清单", command=lambda: self.on_generate_config_list("option")).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(toolbar, text="打开输出文件夹", command=lambda: os.startfile(OUTPUT_DIR)).pack(side=LEFT)
 
         settings_row = ttk.Frame(main)
         settings_row.pack(fill="x")
-        quote_info = ttk.LabelFrame(settings_row, text="报价单信息", padding=10)
+        quote_info = ttk.LabelFrame(settings_row, text="报价单信息", padding=10, style="Title.TLabelframe")
         quote_info.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
-        product_info = ttk.LabelFrame(settings_row, text="产品信息", padding=10)
+        product_info = ttk.LabelFrame(settings_row, text="产品信息", padding=10, style="Title.TLabelframe")
         product_info.pack(side=LEFT, fill="both", expand=True)
 
         self.language_combo = ttk.Combobox(quote_info, textvariable=self.language_label, values=list(LANG_OPTIONS), width=12, state="readonly")
@@ -1333,7 +1487,7 @@ class QuotationApp:
         self.model_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_forms())
         self.form_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_screen())
 
-        terms = ttk.LabelFrame(main, text="交易条款及其他信息", padding=10)
+        terms = ttk.LabelFrame(main, text="交易条款及其他信息", padding=10, style="Title.TLabelframe")
         terms.pack(fill="x", pady=(10, 0))
         defaults = {
             "payment": "合同签订后支付30%作为定金，发货前付清剩余70%合同款。",
@@ -1367,12 +1521,36 @@ class QuotationApp:
         body.add(left, weight=1)
         body.add(right, weight=2)
 
-        info_box = ttk.LabelFrame(left, text="产品基本信息", padding=10)
-        info_box.pack(fill=BOTH, expand=True)
+        info_box = ttk.LabelFrame(left, text="产品基本信息", padding=10, style="Title.TLabelframe")
+        info_box.pack(fill="x", pady=(0, 8))
         self.info_label = ttk.Label(info_box, text="", justify=LEFT)
         self.info_label.pack(anchor="nw")
 
-        option_box = ttk.LabelFrame(right, text="可选增减配置（报价单不显示价格）", padding=10)
+        basic_config_box = ttk.LabelFrame(left, text="产品基本配置", padding=10, style="Title.TLabelframe")
+        basic_config_box.pack(fill=BOTH, expand=True)
+        self.basic_config_tree = ttk.Treeview(
+            basic_config_box,
+            columns=("seq", "component", "name", "model_code", "mark"),
+            show="headings",
+            height=12,
+        )
+        basic_headings = {
+            "seq": "序号",
+            "component": "部件",
+            "name": "名称",
+            "model_code": "代号",
+            "mark": "数量",
+        }
+        basic_widths = {"seq": 50, "component": 110, "name": 150, "model_code": 170, "mark": 80}
+        for col in basic_headings:
+            self.basic_config_tree.heading(col, text=basic_headings[col])
+            self.basic_config_tree.column(col, width=basic_widths[col], anchor="w")
+        basic_scroll = ttk.Scrollbar(basic_config_box, orient=VERTICAL, command=self.basic_config_tree.yview)
+        self.basic_config_tree.configure(yscrollcommand=basic_scroll.set)
+        self.basic_config_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        basic_scroll.pack(side=RIGHT, fill="y")
+
+        option_box = ttk.LabelFrame(right, text="可选增减配置（报价单不显示价格）", padding=10, style="Title.TLabelframe")
         option_box.pack(fill=BOTH, expand=True)
         self.option_frame = ScrollableFrame(option_box)
         self.option_frame.pack(fill=BOTH, expand=True)
@@ -1381,7 +1559,8 @@ class QuotationApp:
         bottom_bar.pack(side="bottom", fill="x", anchor="w")
         ttk.Button(bottom_bar, text="研发配置导入模块", command=self.open_research_import_module).pack(side=LEFT, padx=(0, 8))
         ttk.Button(bottom_bar, text="查看机型配置表导入状态", command=self.show_config_status).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(bottom_bar, text="配置导入修改记录", command=self.show_change_log).pack(side=LEFT)
+        ttk.Button(bottom_bar, text="配置导入修改记录", command=self.show_change_log).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(bottom_bar, text="打开输出文件夹", command=lambda: os.startfile(OUTPUT_DIR)).pack(side=LEFT)
 
     def current_product(self):
         return self.db.get("products", {}).get(self.model_var.get(), {})
@@ -1421,6 +1600,7 @@ class QuotationApp:
 
     def refresh_screen(self):
         self.refresh_info()
+        self.refresh_basic_config()
         self.refresh_options()
 
     def refresh_info(self):
@@ -1447,27 +1627,62 @@ class QuotationApp:
             child.destroy()
         self.option_vars = []
         self.option_qty_vars = []
-        options = self.current_options()
-        if not options:
-            ttk.Label(self.option_frame.inner, text="当前机型暂无增减配信息。").pack(anchor="w")
+        self.option_type_vars = []
+        self.config_option_items = []
+        if not self.model_var.get() or not self.form_var.get():
+            ttk.Label(self.option_frame.inner, text="请先选择产品型号和安装形式。").pack(anchor="w")
             return
+        try:
+            options = option_config_items(self.db, self.model_var.get(), self.form_var.get())
+        except Exception as exc:
+            ttk.Label(self.option_frame.inner, text=f"无法读取配置表增减配数据：{exc}").pack(anchor="w")
+            return
+        self.config_option_items = options
+        if not options:
+            ttk.Label(self.option_frame.inner, text="当前安装形式暂无可选增减配置。").pack(anchor="w")
+            return
+
         header = ttk.Frame(self.option_frame.inner)
         header.pack(fill="x", pady=(0, 4))
         ttk.Label(header, text="选择", width=6).pack(side=LEFT)
         ttk.Label(header, text="数量", width=8).pack(side=LEFT, padx=(0, 6))
-        ttk.Label(header, text="增减配项目").pack(side=LEFT)
+        ttk.Label(header, text="增减配", width=10).pack(side=LEFT, padx=(0, 6))
+        ttk.Label(header, text="项目").pack(side=LEFT)
         for option in options:
             row = ttk.Frame(self.option_frame.inner)
             row.pack(fill="x", anchor="w", pady=2)
             var = BooleanVar(value=False)
             qty_var = StringVar(value="1")
+            type_var = StringVar(value="增配")
             self.option_vars.append(var)
             self.option_qty_vars.append(qty_var)
-            action = "减配" if clean_text(option.get("change_type_code")) == "20" else "增配"
-            text = f"{action} | {option.get('category', '')} | {option.get('part_code', '')} | {option.get('part_name', '')}"
+            self.option_type_vars.append(type_var)
             ttk.Checkbutton(row, variable=var).pack(side=LEFT)
             ttk.Spinbox(row, from_=1, to=999, textvariable=qty_var, width=6).pack(side=LEFT, padx=(0, 8))
-            ttk.Label(row, text=text).pack(side=LEFT, anchor="w")
+            ttk.Combobox(row, textvariable=type_var, values=["增配", "减配"], width=8, state="readonly").pack(side=LEFT, padx=(0, 8))
+            ttk.Label(row, text=option.get("item_display", ""), wraplength=520).pack(side=LEFT, anchor="w")
+
+    def refresh_basic_config(self):
+        for item_id in self.basic_config_tree.get_children():
+            self.basic_config_tree.delete(item_id)
+        if not self.model_var.get() or not self.form_var.get():
+            return
+        try:
+            items = basic_config_items(self.db, self.model_var.get(), self.form_var.get())
+        except Exception:
+            items = []
+        for idx, item in enumerate(items, start=1):
+            self.basic_config_tree.insert(
+                "",
+                "end",
+                values=(
+                    idx,
+                    item.get("component", ""),
+                    item.get("name", ""),
+                    item.get("model_code", ""),
+                    item.get("mark", ""),
+                ),
+            )
 
     def reload_db(self):
         self.db = load_database()
@@ -1745,6 +1960,14 @@ class QuotationApp:
         )
 
     def build_quote(self):
+        selected_items = []
+        for idx, var in enumerate(self.option_vars):
+            if not var.get() or idx >= len(self.config_option_items):
+                continue
+            item = dict(self.config_option_items[idx])
+            item["quantity"] = clean_text(self.option_qty_vars[idx].get()) or "1"
+            item["change_type"] = self.option_type_vars[idx].get() if idx < len(self.option_type_vars) else "增配"
+            selected_items.append(item)
         return QuoteInput(
             language=LANG_OPTIONS.get(self.language_label.get(), "zh"),
             model_name=self.model_var.get(),
@@ -1771,6 +1994,7 @@ class QuotationApp:
                 for idx, var in enumerate(self.option_vars)
                 if var.get()
             },
+            selected_option_items=selected_items,
         )
 
     def on_generate(self):
@@ -1783,7 +2007,12 @@ class QuotationApp:
         output = OUTPUT_DIR / f"中联塔机报价单_{safe_model}_{quote.quote_date}.pdf"
         try:
             make_pdf(self.db, quote, output)
-            messagebox.showinfo("生成完成", f"已生成:\n{output}")
+            generated = [output]
+            if quote.selected_option_items:
+                ltc_output = available_output_path(OUTPUT_DIR / f"LTC选配指导文件_{safe_model}_{quote.quote_date}.pdf")
+                make_ltc_option_pdf(quote, ltc_output)
+                generated.append(ltc_output)
+            messagebox.showinfo("生成完成", "已生成:\n" + "\n".join(str(path) for path in generated))
             os.startfile(output)
         except Exception as exc:
             messagebox.showerror("生成失败", str(exc))
