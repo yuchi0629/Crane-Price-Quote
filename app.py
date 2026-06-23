@@ -453,13 +453,21 @@ def find_config_form_columns(ws):
         if "标配" in row_text and "选配" in row_text and "不配" in row_text:
             form_row = row_idx + 1
             break
+    form_tokens = ["固定式", "附着", "内爬", "行走", "压重"]
     for row_idx in range(1, min(ws.max_row, 12) + 1):
         if form_row:
             break
         values = [clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1)]
-        if any("固定式" in value or "附着" in value or "内爬" in value for value in values):
+        form_columns = [
+            col
+            for col, value in enumerate(values, start=1)
+            if any(token in normalize_form(value) for token in form_tokens)
+        ]
+        if len(form_columns) >= 2:
             form_row = row_idx
             break
+        if len(form_columns) == 1 and form_columns[0] > 1:
+            form_row = row_idx
     if not form_row:
         return 4, {}
 
@@ -470,7 +478,7 @@ def find_config_form_columns(ws):
             continue
         if "备注" in value or "更改" in value or "标配" in value or "选配" in value:
             continue
-        if any(token in value for token in ["固定式", "附着", "内爬", "行走", "压重"]):
+        if any(token in normalize_form(value) for token in form_tokens):
             columns[normalize_form(value)] = col
     return form_row, columns
 
