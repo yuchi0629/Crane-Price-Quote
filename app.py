@@ -629,8 +629,8 @@ def basic_config_items(db, model_name, install_form):
 def option_config_items(db, model_name, install_form):
     rows = config_rows_for_form(db, model_name, install_form)
     items = []
-    has_climbing = False
-    has_collector = False
+    climbing_items = []
+    collector_items = []
     for row in rows:
         text = " ".join(
             [
@@ -645,19 +645,23 @@ def option_config_items(db, model_name, install_form):
         if "电源箱总成" in text:
             continue
         if "爬升" in text:
-            has_climbing = True
+            child = dict(row)
+            child["item_display"] = "、".join(value for value in [child.get("component", ""), child.get("name", ""), child.get("model_code", "")] if value)
+            climbing_items.append(child)
             continue
         if "中央集电环" in text:
-            has_collector = True
+            child = dict(row)
+            child["item_display"] = "、".join(value for value in [child.get("component", ""), child.get("name", ""), child.get("model_code", "")] if value)
+            collector_items.append(child)
             continue
         if "○" in row.get("mark", "") or any(keyword in row.get("row_text", "") for keyword in EXPORT_OPTION_KEYWORDS):
             item = dict(row)
             item["item_display"] = "、".join(value for value in [item.get("component", ""), item.get("name", ""), item.get("model_code", "")] if value)
             items.append(item)
-    if has_climbing:
-        items.append({"composition": "爬升", "component": "爬升包", "name": "爬升包", "code": "", "model_code": "", "mark": "○", "item_display": "爬升包"})
-    if has_collector:
-        items.append({"composition": "中央集电环", "component": "中央集电环包", "name": "中央集电环包", "code": "", "model_code": "", "mark": "○", "item_display": "中央集电环包"})
+    if climbing_items:
+        items.append({"composition": "爬升", "component": "爬升包", "name": "爬升包", "code": "", "model_code": "", "mark": "○", "item_display": "爬升包", "children": climbing_items})
+    if collector_items:
+        items.append({"composition": "中央集电环", "component": "中央集电环包", "name": "中央集电环包", "code": "", "model_code": "", "mark": "○", "item_display": "中央集电环包", "children": collector_items})
     return items
 
 
@@ -853,6 +857,10 @@ def find_component_config(db, model_name):
         if cfg.get("model_key") == model_key:
             return cfg
     return {}
+
+
+def has_imported_config(db, model_name):
+    return bool(find_component_config(db, model_name) or find_export_config(db, model_name) or find_initial_export_config(model_name))
 
 
 def find_initial_export_config(model_name):
@@ -1385,18 +1393,34 @@ def make_ltc_option_pdf(quote, output_path):
         make_paragraph("代号", center),
         make_paragraph("数量", center),
     ]]
-    for idx, item in enumerate(quote.selected_option_items or [], start=1):
+    expanded_items = []
+    for item in quote.selected_option_items or []:
+        children = item.get("children") or []
+        if children:
+            for child in children:
+                expanded = dict(child)
+                expanded["change_type"] = item.get("change_type", "增配")
+                expanded["quantity"] = clean_text(item.get("quantity", "")) or clean_text(child.get("quantity", "")) or "1"
+                expanded["package_name"] = item.get("item_display", "") or item.get("name", "")
+                expanded_items.append(expanded)
+        else:
+            expanded_items.append(item)
+    for idx, item in enumerate(expanded_items, start=1):
+        composition = item.get("composition", "")
+        package_name = item.get("package_name", "")
+        if package_name and package_name not in composition:
+            composition = f"{composition}（{package_name}）" if composition else package_name
         rows.append([
             clean_text(idx),
             make_paragraph(item.get("change_type", "增配"), center),
-            make_paragraph(item.get("composition", ""), left),
+            make_paragraph(composition, left),
             make_paragraph(item.get("component", ""), left),
             make_paragraph(item.get("name", ""), left),
             make_paragraph(item.get("code", ""), left),
             make_paragraph(item.get("model_code", ""), left),
             make_paragraph(clean_text(item.get("quantity", "")) or "1", center),
         ])
-    table = Table(rows, colWidths=[9 * mm, 17 * mm, 27 * mm, 28 * mm, 42 * mm, 35 * mm, 30 * mm, 13 * mm], repeatRows=1)
+    table = Table(rows, colWidths=[8 * mm, 15 * mm, 26 * mm, 26 * mm, 36 * mm, 31 * mm, 27 * mm, 13 * mm], repeatRows=1)
     table.setStyle(table_style())
     story.append(table)
     doc.build(story)
@@ -1426,6 +1450,8 @@ class QuotationApp:
         self.user_settings = load_user_settings()
         self.language_label = StringVar(value="中文")
         self.model_var = StringVar()
+        self.model_display_var = StringVar()
+        self.model_display_to_name = {}
         self.form_var = StringVar()
         self.date_var = StringVar(value=date.today().isoformat())
         self.trade_term = StringVar(value="FOB")
@@ -1477,16 +1503,36 @@ class QuotationApp:
         info_box = ttk.LabelFrame(settings_row, text="产品基本信息", padding=10, style="Title.TLabelframe")
         info_box.pack(side=LEFT, fill="both", expand=True)
 
-        self.model_combo = ttk.Combobox(product_select, textvariable=self.model_var, width=28, state="readonly")
+        self.model_combo = ttk.Combobox(product_select, textvariable=self.model_display_var, width=28, state="readonly")
         self.form_combo = ttk.Combobox(product_select, textvariable=self.form_var, width=24, state="readonly")
         ttk.Label(product_select, text="产品型号").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=4)
         self.model_combo.grid(row=0, column=1, sticky="we", pady=4)
         ttk.Label(product_select, text="安装形式").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=4)
         self.form_combo.grid(row=1, column=1, sticky="we", pady=4)
         product_select.columnconfigure(1, weight=1)
-        self.info_label = ttk.Label(info_box, text="", justify=LEFT)
-        self.info_label.pack(anchor="nw")
-        self.model_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_forms())
+        self.info_message_label = ttk.Label(info_box, text="", justify=LEFT)
+        self.info_value_labels = {}
+        info_items = [
+            ("product_code", "产品编码"),
+            ("tower_type", "塔机类型"),
+            ("height", "独立高度"),
+            ("jib_length", "最大臂长"),
+            ("max_load", "最大起重量"),
+            ("rope_capacity", "容绳量"),
+            ("mast_type", "塔身种类"),
+            ("component_count", "配置表主要部件"),
+        ]
+        for idx, (key, label_text) in enumerate(info_items):
+            row = idx // 2
+            col = (idx % 2) * 2
+            ttk.Label(info_box, text=f"{label_text}:").grid(row=row, column=col, sticky="w", padx=(0, 4), pady=2)
+            value_label = ttk.Label(info_box, text="", width=22)
+            value_label.grid(row=row, column=col + 1, sticky="w", padx=(0, 16), pady=2)
+            self.info_value_labels[key] = value_label
+        self.info_message_label.grid(row=4, column=0, columnspan=4, sticky="w", pady=(6, 0))
+        info_box.columnconfigure(1, weight=1)
+        info_box.columnconfigure(3, weight=1)
+        self.model_combo.bind("<<ComboboxSelected>>", lambda _e: self.on_model_selected())
         self.form_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_screen())
 
         body = ttk.PanedWindow(main, orient="horizontal")
@@ -1637,13 +1683,29 @@ class QuotationApp:
         product_code = self.current_product().get("product_code", "")
         return self.db.get("options_by_code", {}).get(product_code, [])
 
+    def model_display_name(self, model):
+        status = "√" if has_imported_config(self.db, model) else "×"
+        return f"{status} {model}"
+
+    def on_model_selected(self):
+        display = self.model_display_var.get()
+        model = self.model_display_to_name.get(display, display[2:] if len(display) > 2 and display[1] == " " else display)
+        self.model_var.set(model)
+        self.refresh_forms()
+
     def refresh_models(self):
-        models = sorted(model for model in self.db.get("products", {}) if is_visible_product_model(model))
-        self.model_combo["values"] = models
+        models = sorted(
+            (model for model in self.db.get("products", {}) if is_visible_product_model(model)),
+            key=lambda model: (0 if has_imported_config(self.db, model) else 1, model),
+        )
+        display_values = [self.model_display_name(model) for model in models]
+        self.model_display_to_name = dict(zip(display_values, models))
+        self.model_combo["values"] = display_values
         if models and self.model_var.get() not in models:
             self.model_var.set(models[0])
         elif not models:
             self.model_var.set("")
+        self.model_display_var.set(self.model_display_name(self.model_var.get()) if self.model_var.get() else "")
         self.refresh_forms()
 
     def refresh_forms(self):
@@ -1664,20 +1726,24 @@ class QuotationApp:
         product = self.current_product()
         form = self.current_form()
         if not product:
-            self.info_label.config(text="请先导入增减配价格表，系统会从 D列=B1 的数据识别机型。")
+            for label_widget in self.info_value_labels.values():
+                label_widget.config(text="")
+            self.info_message_label.config(text="请先导入增减配价格表，系统会从 D列=B1 的数据识别机型。")
             return
         type_info = product.get("tower_type", {})
-        text = (
-            f"产品编码: {product.get('product_code', '')}\n"
-            f"塔机类型: {type_info.get('zh', '')}\n"
-            f"独立高度: {mm_value(form.get('height'))}\n"
-            f"最大臂长: {mm_value(form.get('jib_length') or product.get('default_jib_length'))}\n"
-            f"最大起重量: {product.get('max_load', '')}\n"
-            f"容绳量: {mm_value(form.get('rope_capacity'))}\n"
-            f"塔身种类: {product.get('mast_type', '')}\n"
-            f"配置表主要部件: {len(select_components(self.db, self.model_var.get(), self.form_var.get()))} 条"
-        )
-        self.info_label.config(text=text)
+        values = {
+            "product_code": product.get("product_code", ""),
+            "tower_type": type_info.get("zh", ""),
+            "height": mm_value(form.get("height")),
+            "jib_length": mm_value(form.get("jib_length") or product.get("default_jib_length")),
+            "max_load": product.get("max_load", ""),
+            "rope_capacity": mm_value(form.get("rope_capacity")),
+            "mast_type": product.get("mast_type", ""),
+            "component_count": f"{len(select_components(self.db, self.model_var.get(), self.form_var.get()))} 条",
+        }
+        for key, value in values.items():
+            self.info_value_labels[key].config(text=value)
+        self.info_message_label.config(text="")
 
     def refresh_options(self):
         for child in self.option_frame.inner.winfo_children():
