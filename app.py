@@ -1,0 +1,1823 @@
+import base64
+import json
+import os
+import re
+import sys
+from io import BytesIO
+from dataclasses import dataclass
+from datetime import date, datetime
+from pathlib import Path
+from tkinter import BOTH, LEFT, RIGHT, VERTICAL, BooleanVar, Canvas, StringVar, Text, Tk, Toplevel, filedialog, messagebox
+from tkinter import ttk
+
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import BaseDocTemplate, Frame, Image, PageTemplate, Paragraph, Table, TableStyle
+
+
+BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    USER_DATA_ROOT = Path(os.environ.get("APPDATA", APP_DIR)) / "ZoomlionTowerCraneQuotation"
+    DATA_DIR = USER_DATA_ROOT / "data"
+    OUTPUT_DIR = Path(os.environ.get("USERPROFILE", APP_DIR)) / "Documents" / "中联塔机报价单输出"
+else:
+    DATA_DIR = APP_DIR / "data"
+    OUTPUT_DIR = APP_DIR / "output" / "pdf"
+DB_FILE = DATA_DIR / "quotation_database.json"
+SETTINGS_FILE = DATA_DIR / "user_settings.json"
+INITIAL_DB_FILE = BUNDLE_DIR / "data" / "quotation_database.json"
+EMBEDDED_LOGO_PNG = (
+    "iVBORw0KGgoAAAANSUhEUgAAAGwAAAAfCAYAAAAC0CiiAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8"
+    "YQUAAAAJcEhZcwAADsQAAA7EAZUrDhsAAANKSURBVGhD7ZoxSBtRGMf/7WQLBUsKUWgiImZwEMngECxdQ"
+    "gfXFIcOJUNxkkxO2k6tTplCJ6dMDtIM7eBQsoiSoUMQCw4RkZpCFSoVHOrWvvfue5d3d8kl7y6lPHg/CP"
+    "fd3efly/2/933fK72z08z9gcUY7tLRYghWMMOwghmGFcwwrGCGYQUzDCuYYVjBDMMKZhh6/9JxcIql0iW"
+    "d9KAwg531UTphdPmbzGoW716M0JmPgfxvsVtsonpEp0hirTmFOTpz8PnMTqJSHceYet0fK3G40cBmjRnd7"
+    "g/4e9xnMPKVHJYXHFsS+h0hDHmFPUDxpfxy/mIaXQVulZtYyp7ikM4ddP1VLvHlgExJ+xcarqDDIHp89VJ"
+    "Y7HroCbYwBbYifZ8Z5Ol2ZnUaiynHvtg+cbObZ6Dr/3ESGXH1Epsb18Li6PpLMrMPxLG+5713sf8TLXaU9"
+    "+MSNT6HsHt6xFxhPOuOUecmW9qdsnCNT+Ubx/RcZ6TGsbJKL7HWxm6bG7r+CtP3nRdWu1Ky+BbNz/x5SaS"
+    "n6bmxiBFfIekkdO0YW/4qEIFYgnWyjvUQT9+6ckT0lMgOY08eUVbe4Ps3dtD1V5lMIDfLDaUsynJYSGDeu"
+    "RKPOPEhgeVKUlj10tegoJpEF4w13xJlXb7ib/h9SN1Dmszz81uyQgj1H0H2mbcsynKYfxp8uf+Efr+HtZK"
+    "1AjduUH3zAxfiYjQiCnaNLWq+vJ77J6C+tH/jnMx02jtddaWPv5vhoiR1yuG8blxRGeD3zK1Trz86w/vtA"
+    "ZK0BxEEU/oWG5VXfOOsYIL6Csuoxn4wOLkCeIl5PMEOuv5+Ug+pLLKStN8ph1qrPoy48QlG3dLYKp/gw4k"
+    "wtdEWzNO3xL6mC6wRPxclwBl5X6sZpZRSFFLOVKnrH2AEi6+oT5TPhl8OY8dHKKWxRROnLnqCqcHxUTXL9"
+    "iX+D42vc+tZFEXWy30K3Zf7GL6RVQYVXf8ACwl3ezFwOWSTm/s9/FPs3V9ix0eoz4mClmCHe8FNY29Y1ld"
+    "zqMiRV0HsYwKrU9ffzyjmaRUMtRy6xI1Pwp7zVu7d9LH/CccwIk6Jlv+FFcwwrGCGYQUzDCuYYVjBDMMKZ"
+    "hhWMMOwghkF8Bd9LbQQl4zAawAAAABJRU5ErkJggg=="
+)
+
+COMPONENT_KEYWORDS = [
+    ("起重臂", "Jib"),
+    ("平衡臂", "Counter-jib"),
+    ("司机室", "Cabin"),
+    ("上支座", "Upper support"),
+    ("回转支承", "Slewing bearing"),
+    ("下支座", "Lower support"),
+    ("吊钩", "Hook"),
+    ("标准节", "Mast section"),
+    ("底架", "Base frame"),
+    ("支腿组件", "Support leg assembly"),
+    ("基础预埋", "Support leg assembly", "支腿组件"),
+    ("机构", "Mechanism"),
+    ("钢丝绳", "Wire rope"),
+    ("电控总成", "Electric control assembly"),
+]
+
+LANG_OPTIONS = {"中文": "zh", "English": "en", "Français": "fr", "Deutsch": "de"}
+
+TRANSLATIONS = {
+    "中联塔机报价单": {"en": "TOWER CRANE QUOTATION", "fr": "DEVIS POUR GRUE A TOUR", "de": "ANGEBOT FUER TURMDREHKRAN"},
+    "报价日期": {"en": "Date", "fr": "Date", "de": "Datum"},
+    "报价单位": {"en": "Quotation unit", "fr": "Unite emettrice", "de": "Angebotseinheit"},
+    "报价人": {"en": "Quoted by", "fr": "Emetteur", "de": "Ansprechpartner"},
+    "联系电话": {"en": "Phone", "fr": "Telephone", "de": "Telefon"},
+    "联系邮箱": {"en": "Email", "fr": "E-mail", "de": "E-Mail"},
+    "基本参数": {"en": "BASIC PARAMETER", "fr": "PARAMETRES DE BASE", "de": "GRUNDPARAMETER"},
+    "产品型号": {"en": "Model", "fr": "Modele", "de": "Modell"},
+    "塔机类型": {"en": "Type", "fr": "Type", "de": "Typ"},
+    "独立高度": {"en": "HUH", "fr": "Hauteur autoportante (HUH)", "de": "Freistehende Hoehe (HUH)"},
+    "最大臂长": {"en": "Max jib length", "fr": "Portee maximale", "de": "Max. Auslegerlaenge"},
+    "最大起重量": {"en": "Max load", "fr": "Charge maximale", "de": "Max. Traglast"},
+    "安装形式": {"en": "Installation form", "fr": "Type d'installation", "de": "Aufstellungsart"},
+    "容绳量": {"en": "Rope capacity", "fr": "Capacite de cable", "de": "Seilkapazitaet"},
+    "塔身种类": {"en": "Mast type", "fr": "Type de mat", "de": "Masttyp"},
+    "价格": {"en": "Price", "fr": "Prix", "de": "Preis"},
+    "单价": {"en": "UNIT PRICE", "fr": "PRIX UNITAIRE", "de": "EINHEITSPREIS"},
+    "主要部件配置": {"en": "MAIN COMPONENT CONFIGURATION", "fr": "CONFIGURATION DES COMPOSANTS PRINCIPAUX", "de": "HAUPTKOMPONENTENKONFIGURATION"},
+    "部件名称": {"en": "Component", "fr": "Composant", "de": "Komponente"},
+    "代号": {"en": "Code", "fr": "Code", "de": "Code"},
+    "数量": {"en": "Qty", "fr": "Qte", "de": "Menge"},
+    "增减配置": {"en": "ADDITIONS / DEDUCTIONS", "fr": "AJOUTS / DEDUCTIONS", "de": "ZUSATZ- / ABWAHLKONFIGURATION"},
+    "类型": {"en": "Type", "fr": "Type", "de": "Typ"},
+    "部件代号": {"en": "Part code", "fr": "Code piece", "de": "Teilecode"},
+    "增减部件": {"en": "Part", "fr": "Piece", "de": "Teil"},
+    "交易条款及其他信息": {"en": "TRADE CLAUSE & OTHER INFORMATION", "fr": "CONDITIONS COMMERCIALES ET AUTRES INFORMATIONS", "de": "HANDELSBEDINGUNGEN UND WEITERE INFORMATIONEN"},
+    "付款方式": {"en": "Payment item", "fr": "Modalites de paiement", "de": "Zahlungsbedingungen"},
+    "交货期": {"en": "Delivery time", "fr": "Delai de livraison", "de": "Lieferzeit"},
+    "报价有效期": {"en": "Quotation validity", "fr": "Validite de l'offre", "de": "Angebotsgueltigkeit"},
+    "运输方案": {"en": "Transportation", "fr": "Transport", "de": "Transport"},
+    "质保期": {"en": "Warranty", "fr": "Garantie", "de": "Garantie"},
+    "其他": {"en": "Others", "fr": "Autres", "de": "Sonstiges"},
+    "未导入该机型配置表。": {"en": "No configuration workbook imported for this model.", "fr": "Aucun classeur de configuration importe pour ce modele.", "de": "Keine Konfigurationsarbeitsmappe fuer dieses Modell importiert."},
+    "未选择增减配置。": {"en": "No additions or deductions selected.", "fr": "Aucun ajout ou deduction selectionne.", "de": "Keine Zusatz- oder Abwahlkonfiguration ausgewaehlt."},
+    "增配": {"en": "Addition", "fr": "Ajout", "de": "Zusatz"},
+    "减配": {"en": "Deduction", "fr": "Deduction", "de": "Abwahl"},
+    "平臂塔机": {"en": "Hammerhead tower crane", "fr": "Grue a tour a fleche horizontale", "de": "Obendreher mit horizontalem Ausleger"},
+    "动臂塔机": {"en": "Luffing tower crane", "fr": "Grue a tour a fleche relevable", "de": "Wippausleger-Turmdrehkran"},
+    "风电塔机": {"en": "Wind power tower crane", "fr": "Grue a tour pour eoliennes", "de": "Windkraft-Turmdrehkran"},
+    "平头动臂塔机": {"en": "Flat-top luffing tower crane", "fr": "Grue a fleche relevable a tete plate", "de": "Flat-Top-Wippauslegerkran"},
+    "桅杆吊塔机": {"en": "Derrick tower crane", "fr": "Grue derrick", "de": "Derrickkran"},
+    "塔式起重机": {"en": "Tower crane", "fr": "Grue a tour", "de": "Turmdrehkran"},
+    "中塔": {"en": "Medium tower crane", "fr": "Grue moyenne", "de": "Mittlerer Turmdrehkran"},
+    "小塔": {"en": "Small tower crane", "fr": "Petite grue", "de": "Kleiner Turmdrehkran"},
+    "圆榫节": {"en": "Round-tenon mast section", "fr": "Element de mat a tenon rond", "de": "Rundzapfen-Mastsegment"},
+    "螺栓节": {"en": "Bolted mast section", "fr": "Element de mat boulonne", "de": "Verschraubtes Mastsegment"},
+    "支腿固定式": {"en": "Fixing-angle stationary", "fr": "Fixe sur pieds d'ancrage", "de": "Stationaer mit Fundamentankern"},
+    "底架固定式": {"en": "Base-frame stationary", "fr": "Fixe sur chassis de base", "de": "Stationaer mit Grundrahmen"},
+    "基础": {"en": "Foundation", "fr": "Fondation", "de": "Fundament"},
+    "选配部件": {"en": "Optional parts", "fr": "Pieces optionnelles", "de": "Optionale Teile"},
+    "平衡重": {"en": "Counterweight", "fr": "Contrepoids", "de": "Gegengewicht"},
+    "空调": {"en": "Air conditioner", "fr": "Climatiseur", "de": "Klimaanlage"},
+    "起重臂": {"en": "Jib", "fr": "Fleche", "de": "Ausleger"},
+    "平衡臂": {"en": "Counter-jib", "fr": "Contre-fleche", "de": "Gegenausleger"},
+    "司机室": {"en": "Cabin", "fr": "Cabine", "de": "Kabine"},
+    "上支座": {"en": "Upper support", "fr": "Support superieur", "de": "Oberer Traeger"},
+    "回转支承": {"en": "Slewing bearing", "fr": "Couronne d'orientation", "de": "Drehverbindung"},
+    "下支座": {"en": "Lower support", "fr": "Support inferieur", "de": "Unterer Traeger"},
+    "吊钩": {"en": "Hook", "fr": "Crochet", "de": "Haken"},
+    "吊钩组": {"en": "Hook block", "fr": "Moufle a crochet", "de": "Hakenflasche"},
+    "标准节": {"en": "Mast section", "fr": "Element de mat", "de": "Mastsegment"},
+    "圆榫标准节": {"en": "Round-tenon mast section", "fr": "Element de mat a tenon rond", "de": "Rundzapfen-Mastsegment"},
+    "底架": {"en": "Base frame", "fr": "Chassis de base", "de": "Grundrahmen"},
+    "支腿组件": {"en": "Support leg assembly", "fr": "Ensemble de pieds de support", "de": "Stuetzbeinbaugruppe"},
+    "基础预埋": {"en": "Embedded foundation parts", "fr": "Pieces encastrees de fondation", "de": "Einbauteile fuer Fundament"},
+    "机构": {"en": "Mechanism", "fr": "Mecanisme", "de": "Antrieb"},
+    "钢丝绳": {"en": "Wire rope", "fr": "Cable acier", "de": "Stahldrahtseil"},
+    "电控总成": {"en": "Electric control assembly", "fr": "Ensemble de commande electrique", "de": "Elektrische Steuerungseinheit"},
+    "安全钢丝绳": {"en": "Safety wire rope", "fr": "Cable de securite", "de": "Sicherheitsdrahtseil"},
+    "起升机构": {"en": "Hoisting mechanism", "fr": "Mecanisme de levage", "de": "Hubwerk"},
+    "回转机构": {"en": "Slewing mechanism", "fr": "Mecanisme d'orientation", "de": "Drehwerk"},
+    "变幅机构": {"en": "Trolleying mechanism", "fr": "Mecanisme de variation de portee", "de": "Katzfahrwerk"},
+    "起升钢丝绳": {"en": "Hoisting wire rope", "fr": "Cable de levage", "de": "Hubseil"},
+    "变幅钢丝绳": {"en": "Trolleying wire rope", "fr": "Cable de variation de portee", "de": "Katzfahrseil"},
+    "起升机构带插头电缆包": {"en": "Hoisting mechanism plug cable package", "fr": "Kit cable avec fiche du mecanisme de levage", "de": "Steckerkabelsatz fuer Hubwerk"},
+    "变幅机构带插头电缆包": {"en": "Trolleying mechanism plug cable package", "fr": "Kit cable avec fiche du mecanisme de variation de portee", "de": "Steckerkabelsatz fuer Katzfahrwerk"},
+    "回转机构带插头电缆包": {"en": "Slewing mechanism plug cable package", "fr": "Kit cable avec fiche du mecanisme d'orientation", "de": "Steckerkabelsatz fuer Drehwerk"},
+    "4.5m城市底架": {"en": "4.5m city base frame", "fr": "Chassis urbain 4.5 m", "de": "4,5-m-Stadtgrundrahmen"},
+    "平衡重(24.6T)": {"en": "Counterweight (24.6t)", "fr": "Contrepoids (24,6 t)", "de": "Gegengewicht (24,6 t)"},
+    "平衡重(26.4T)": {"en": "Counterweight (26.4t)", "fr": "Contrepoids (26,4 t)", "de": "Gegengewicht (26,4 t)"},
+    "矮标准节": {"en": "Short mast section", "fr": "Element de mat court", "de": "Kurzes Mastsegment"},
+    "分体式空调组件": {"en": "Split air conditioner assembly", "fr": "Ensemble climatiseur split", "de": "Split-Klimageraet-Baugruppe"},
+    "右交": {"en": "right lay", "fr": "toronnage droit", "de": "rechtsgaengig"},
+    "左交": {"en": "left lay", "fr": "toronnage gauche", "de": "linksgaengig"},
+    "合同签订后支付30%作为定金，发货前付清剩余70%合同款。": {
+        "en": "30% by T/T as prepayment after contract signing, and the remaining 70% before delivery.",
+        "fr": "30 % par virement T/T a titre d'acompte apres la signature du contrat, et les 70 % restants avant la livraison.",
+        "de": "30 % per T/T als Anzahlung nach Vertragsunterzeichnung und die restlichen 70 % vor Lieferung.",
+    },
+    "收到定金后90日内发货。": {
+        "en": "Delivery within 90 days after receipt of prepayment.",
+        "fr": "Livraison dans les 90 jours apres reception de l'acompte.",
+        "de": "Lieferung innerhalb von 90 Tagen nach Eingang der Anzahlung.",
+    },
+    "30天": {"en": "30 days", "fr": "30 jours", "de": "30 Tage"},
+    "以最终发运方案为准。": {
+        "en": "Subject to the final shipment plan.",
+        "fr": "Sous reserve du plan d'expedition final.",
+        "de": "Massgeblich ist der endgueltige Versandplan.",
+    },
+    "自提单之日起保修期：钢结构12个月；机构12个月；电气部件12个月。易损件除外。": {
+        "en": "Warranty period from the date of B/L: 12 months for steel structure, 12 months for mechanisms, and 12 months for electric parts. Wearing parts are excluded.",
+        "fr": "Periode de garantie a compter de la date du connaissement: 12 mois pour la structure acier, 12 mois pour les mecanismes et 12 mois pour les composants electriques. Les pieces d'usure sont exclues.",
+        "de": "Garantiezeit ab Datum des Konnossements: 12 Monate fuer Stahlkonstruktion, 12 Monate fuer Mechanismen und 12 Monate fuer elektrische Teile. Verschleissteile sind ausgeschlossen.",
+    },
+    "报价含首次安装指导服务费用。": {
+        "en": "The quotation includes the first installation guidance service fee.",
+        "fr": "Le devis comprend les frais du premier service de guidage d'installation.",
+        "de": "Das Angebot enthaelt die Kosten fuer die erstmalige Montageanleitung.",
+    },
+    "上海港": {"en": "Shanghai Port", "fr": "Port de Shanghai", "de": "Hafen Shanghai"},
+    "中联建起（ZOOMLION Construction Hoisting Machinery Company）": {
+        "en": "ZOOMLION Construction Hoisting Machinery Company",
+        "fr": "ZOOMLION Construction Hoisting Machinery Company",
+        "de": "ZOOMLION Construction Hoisting Machinery Company",
+    },
+    "中联建起": {
+        "en": "ZOOMLION Construction Hoisting Machinery Company",
+        "fr": "ZOOMLION Construction Hoisting Machinery Company",
+        "de": "ZOOMLION Construction Hoisting Machinery Company",
+    },
+    "中联重科建筑起重机械公司": {
+        "en": "ZOOMLION Construction Hoisting Machinery Company",
+        "fr": "ZOOMLION Construction Hoisting Machinery Company",
+        "de": "ZOOMLION Construction Hoisting Machinery Company",
+    },
+}
+
+
+def ensure_dirs():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def default_database():
+    return {
+        "products": {},
+        "forms_by_code": {},
+        "components_by_model": {},
+        "config_exports_by_model": {},
+        "options_by_code": {},
+        "change_log": [],
+    }
+
+
+def load_database():
+    ensure_dirs()
+    source = DB_FILE if DB_FILE.exists() else INITIAL_DB_FILE
+    if not source.exists():
+        return default_database()
+    with source.open("r", encoding="utf-8") as f:
+        db = json.load(f)
+    base = default_database()
+    base.update(db)
+    return base
+
+
+def save_database(db):
+    ensure_dirs()
+    with DB_FILE.open("w", encoding="utf-8") as f:
+        json.dump(db, f, ensure_ascii=False, indent=2)
+
+
+def append_change_log(operator_id, operation_time, content):
+    db = load_database()
+    db.setdefault("change_log", []).append(
+        {
+            "time": clean_text(operation_time) or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "operator_id": clean_text(operator_id),
+            "content": clean_text(content),
+        }
+    )
+    save_database(db)
+
+
+def default_user_settings():
+    return {
+        "header_address": "Zoomlion Smart City Headquarters Building, No.613 NaqiuRoad, WangCheng District, Changsha, Hunan, China",
+        "quote_company": "中联重科建筑起重机械公司",
+        "quote_person": "Lewis",
+        "quote_phone": "+86 123456789",
+        "quote_email": "",
+    }
+
+
+def load_user_settings():
+    ensure_dirs()
+    settings = default_user_settings()
+    if SETTINGS_FILE.exists():
+        try:
+            with SETTINGS_FILE.open("r", encoding="utf-8") as f:
+                saved = json.load(f)
+            if isinstance(saved, dict):
+                settings.update({key: clean_text(value) for key, value in saved.items() if key in settings})
+        except Exception:
+            pass
+    return settings
+
+
+def save_user_settings(settings):
+    ensure_dirs()
+    with SETTINGS_FILE.open("w", encoding="utf-8") as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+
+def clean_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def normalize_key(value):
+    return re.sub(r"\s+", "", clean_text(value)).replace("（", "(").replace("）", ")").upper()
+
+
+def normalize_form(value):
+    return re.sub(r"\s+", "", clean_text(value))
+
+
+def is_visible_product_model(model_name):
+    model = normalize_key(model_name)
+    return not (model.startswith("D") or model.startswith("ZT"))
+
+
+def format_number(value):
+    text = clean_text(value).replace(",", "")
+    try:
+        number = float(text)
+    except ValueError:
+        return clean_text(value)
+    if number.is_integer():
+        return f"{int(number):,}"
+    return f"{number:,.2f}".rstrip("0").rstrip(".")
+
+
+def parse_config_description(description):
+    result = {}
+    for part in clean_text(description).split(","):
+        if ":" in part:
+            key, value = part.split(":", 1)
+            result[key.strip()] = value.strip()
+    return {
+        "tower_size": result.get("类型", ""),
+        "jib_length": result.get("臂长(M)", ""),
+        "tonnage": result.get("吨数(T)", ""),
+        "mast_type": result.get("塔身种类", ""),
+    }
+
+
+def detect_tower_type(model_name):
+    model = normalize_key(model_name)
+    if model.startswith("LW"):
+        return {"zh": "风电塔机", "en": "Wind power tower crane"}
+    if model.startswith("RL"):
+        return {"zh": "平头动臂塔机", "en": "Flat-top luffing tower crane"}
+    if model.startswith("LR"):
+        return {"zh": "桅杆吊塔机", "en": "Derrick tower crane"}
+    if model.startswith("L"):
+        return {"zh": "动臂塔机", "en": "Luffing tower crane"}
+    if model.startswith(("WA", "W", "T", "R")):
+        return {"zh": "平臂塔机", "en": "Hammerhead tower crane"}
+    return {"zh": "塔式起重机", "en": "Tower crane"}
+
+
+def detect_max_load(model_name):
+    match = re.search(r"-(\d+(?:\.\d+)?)", clean_text(model_name))
+    if not match:
+        return ""
+    value = match.group(1)
+    return f"{value}t"
+
+
+def import_price_file(path):
+    wb = load_workbook(path, data_only=True)
+    ws = wb.active
+    db = load_database()
+    imported_products = set()
+    option_count = 0
+
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        product_group = clean_text(row[3] if len(row) > 3 else "")
+        if product_group != "B1":
+            continue
+        model = clean_text(row[4] if len(row) > 4 else "")
+        config_desc = clean_text(row[5] if len(row) > 5 else "")
+        product_code = clean_text(row[6] if len(row) > 6 else "")
+        if not model or not product_code:
+            continue
+
+        parsed = parse_config_description(config_desc)
+        db["products"][model] = {
+            "model": model,
+            "model_key": normalize_key(model),
+            "product_code": product_code,
+            "config_description": config_desc,
+            "tower_size": parsed["tower_size"],
+            "default_jib_length": parsed["jib_length"],
+            "rated_tonnage": parsed["tonnage"],
+            "mast_type": parsed["mast_type"],
+            "tower_type": detect_tower_type(model),
+            "max_load": detect_max_load(model),
+        }
+        imported_products.add(model)
+
+        option = {
+            "category_code": clean_text(row[8] if len(row) > 8 else ""),
+            "category": clean_text(row[9] if len(row) > 9 else ""),
+            "part_code": clean_text(row[10] if len(row) > 10 else ""),
+            "part_name": clean_text(row[11] if len(row) > 11 else ""),
+            "material_code": clean_text(row[12] if len(row) > 12 else ""),
+            "material_description": clean_text(row[13] if len(row) > 13 else ""),
+            "change_type_code": clean_text(row[14] if len(row) > 14 else ""),
+            "add_price": format_number(row[15] if len(row) > 15 else ""),
+            "deduct_price": format_number(row[16] if len(row) > 16 else ""),
+        }
+        if option["part_name"] or option["part_code"]:
+            db["options_by_code"].setdefault(product_code, [])
+            dedupe = "|".join([option["category_code"], option["part_code"], option["part_name"], option["change_type_code"]])
+            if not any(item.get("_dedupe") == dedupe for item in db["options_by_code"][product_code]):
+                option["_dedupe"] = dedupe
+                db["options_by_code"][product_code].append(option)
+                option_count += 1
+
+    save_database(db)
+    return len(imported_products), option_count
+
+
+def import_product_cfg_file(path):
+    wb = load_workbook(path, data_only=True)
+    ws = wb.active
+    db = load_database()
+    count = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        product_code = clean_text(row[0] if len(row) > 0 else "")
+        if not product_code:
+            continue
+        form = {
+            "install_code": clean_text(row[1] if len(row) > 1 else ""),
+            "install_form": clean_text(row[2] if len(row) > 2 else ""),
+            "height": clean_text(row[9] if len(row) > 9 else ""),
+            "jib_length": clean_text(row[10] if len(row) > 10 else ""),
+            "rope_capacity": clean_text(row[11] if len(row) > 11 else ""),
+            "wire_rope_spec": clean_text(row[12] if len(row) > 12 else ""),
+            "fall": clean_text(row[13] if len(row) > 13 else ""),
+            "hoisting_height": clean_text(row[14] if len(row) > 14 else ""),
+        }
+        if not form["install_form"]:
+            continue
+        forms = db["forms_by_code"].setdefault(product_code, [])
+        key = normalize_form(form["install_form"])
+        forms[:] = [item for item in forms if normalize_form(item.get("install_form")) != key]
+        forms.append(form)
+        count += 1
+    save_database(db)
+    return count
+
+
+def find_config_form_columns(ws):
+    form_row = None
+    for row_idx in range(1, min(ws.max_row, 12) + 1):
+        values = [clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1)]
+        row_text = " ".join(values)
+        if "标配" in row_text and "选配" in row_text and "不配" in row_text:
+            form_row = row_idx + 1
+            break
+    for row_idx in range(1, min(ws.max_row, 12) + 1):
+        if form_row:
+            break
+        values = [clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1)]
+        if any("固定式" in value or "附着" in value or "内爬" in value for value in values):
+            form_row = row_idx
+            break
+    if not form_row:
+        return 4, {}
+
+    columns = {}
+    for col in range(1, ws.max_column + 1):
+        value = clean_text(ws.cell(form_row, col).value)
+        if not value:
+            continue
+        if "备注" in value or "更改" in value or "标配" in value or "选配" in value:
+            continue
+        if any(token in value for token in ["固定式", "附着", "内爬", "行走", "压重"]):
+            columns[normalize_form(value)] = col
+    return form_row, columns
+
+
+def classify_component(row_text):
+    for item in COMPONENT_KEYWORDS:
+        keyword, en = item[0], item[1]
+        display_zh = item[2] if len(item) > 2 else keyword
+        if keyword in row_text:
+            return {"zh": display_zh, "en": en}
+    return None
+
+
+def should_skip_component(row_text):
+    text = clean_text(row_text)
+    return "插头电缆包" in text or "图" in text
+
+
+def quantity_from_mark(mark):
+    text = clean_text(mark)
+    match = re.search(r"[●]\s*[×xX]\s*(\d+(?:\.\d+)?)", text)
+    if match:
+        return match.group(1)
+    return "1"
+
+
+EXPORT_OPTION_KEYWORDS = ["标准节", "基节", "基础节", "底架", "支腿座", "基础预埋", "支腿组件"]
+EXPORT_DROP_KEYWORDS = ["序号", "编码", "备注", "重量", "更改"]
+EXPORT_SCHEMA_VERSION = 3
+
+
+def column_label(col):
+    label = ""
+    while col:
+        col, remainder = divmod(col - 1, 26)
+        label = chr(65 + remainder) + label
+    return label
+
+
+def available_output_path(path):
+    path = Path(path)
+    if not path.exists():
+        return path
+    stamp = datetime.now().strftime("%H%M%S")
+    candidate = path.with_name(f"{path.stem}_{stamp}{path.suffix}")
+    counter = 2
+    while candidate.exists():
+        candidate = path.with_name(f"{path.stem}_{stamp}_{counter}{path.suffix}")
+        counter += 1
+    return candidate
+
+
+def save_workbook_without_overwrite_conflict(wb, output_path):
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    target = available_output_path(output_path)
+    try:
+        wb.save(target)
+        return target
+    except PermissionError:
+        fallback = available_output_path(output_path)
+        wb.save(fallback)
+        return fallback
+
+
+def column_header_text(ws, col, form_row):
+    values = [clean_text(ws.cell(row, col).value) for row in range(1, form_row + 1)]
+    return " ".join(value for value in values if value)
+
+
+def export_column_indexes(ws, form_row, form_col, all_form_cols):
+    columns = []
+    for col in range(1, ws.max_column + 1):
+        header_text = column_header_text(ws, col, form_row)
+        normalized_header = re.sub(r"\s+", "", header_text)
+        if any(keyword in normalized_header for keyword in EXPORT_DROP_KEYWORDS):
+            continue
+        if col in all_form_cols and col != form_col:
+            continue
+        if not header_text and not any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(form_row + 1, ws.max_row + 1)):
+            continue
+        columns.append(col)
+    return columns
+
+
+def row_values(ws, row_idx, columns):
+    return [clean_text(ws.cell(row_idx, col).value) for col in columns]
+
+
+def export_merge_ranges(ws, source_rows, columns):
+    row_map = {row_idx: export_idx for export_idx, row_idx in enumerate(source_rows, start=1)}
+    col_map = {col_idx: export_idx for export_idx, col_idx in enumerate(columns, start=1)}
+    ranges = []
+    for merged in ws.merged_cells.ranges:
+        rows = list(range(merged.min_row, merged.max_row + 1))
+        cols = list(range(merged.min_col, merged.max_col + 1))
+        if not all(row in row_map for row in rows):
+            continue
+        if not all(col in col_map for col in cols):
+            continue
+        ranges.append(
+            {
+                "min_row": row_map[merged.min_row],
+                "max_row": row_map[merged.max_row],
+                "min_col": col_map[merged.min_col],
+                "max_col": col_map[merged.max_col],
+            }
+        )
+    return ranges
+
+
+def build_config_export_rows(ws, form_row, form_columns):
+    all_form_cols = set(form_columns.values())
+    export_forms = {}
+    for form_key, form_col in form_columns.items():
+        columns = export_column_indexes(ws, form_row, form_col, all_form_cols)
+        form_export_col = columns.index(form_col) if form_col in columns else None
+        header_rows = [row_values(ws, row_idx, columns) for row_idx in range(1, form_row + 1)]
+        basic_rows = []
+        basic_source_rows = list(range(1, form_row + 1))
+        option_rows = []
+        option_source_rows = list(range(1, form_row + 1))
+        for row_idx in range(form_row + 1, ws.max_row + 1):
+            full_row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
+            if not full_row_text:
+                continue
+            mark = clean_text(ws.cell(row_idx, form_col).value)
+            values = row_values(ws, row_idx, columns)
+            if "●" in mark:
+                basic_rows.append(values)
+                basic_source_rows.append(row_idx)
+            keyword_match = any(keyword in full_row_text for keyword in EXPORT_OPTION_KEYWORDS)
+            if "○" in mark or keyword_match:
+                values = list(values)
+                if keyword_match and form_export_col is not None:
+                    values[form_export_col] = "○"
+                option_rows.append(values)
+                option_source_rows.append(row_idx)
+        export_forms[form_key] = {
+            "headers": header_rows,
+            "basic_rows": basic_rows,
+            "option_rows": option_rows,
+            "basic_merges": export_merge_ranges(ws, basic_source_rows, columns),
+            "option_merges": export_merge_ranges(ws, option_source_rows, columns),
+        }
+    return export_forms
+
+
+def import_tower_config_file(path, model_name=None):
+    workbook_bytes = Path(path).read_bytes()
+    wb = load_workbook(path, data_only=True)
+    ws = wb.active
+    model_name = clean_text(model_name) or Path(path).stem.replace("（", "(").replace("）", ")")
+
+    form_row, form_columns = find_config_form_columns(ws)
+    components_by_form = {form: [] for form in form_columns}
+    export_forms = build_config_export_rows(ws, form_row, form_columns)
+
+    for row_idx in range(form_row + 1, ws.max_row + 1):
+        source_values = [ws.cell(row_idx, col).value for col in range(2, 7)]
+        row_text = " ".join(clean_text(value) for value in source_values)
+        if should_skip_component(row_text):
+            continue
+        component = classify_component(row_text)
+        if not component:
+            continue
+        part_name = clean_text(ws.cell(row_idx, 4).value) or clean_text(ws.cell(row_idx, 3).value) or component["zh"]
+        code = clean_text(ws.cell(row_idx, 6).value) or clean_text(ws.cell(row_idx, 5).value)
+        for form_key, col in form_columns.items():
+            mark = clean_text(ws.cell(row_idx, col).value)
+            if "●" not in mark:
+                continue
+            components_by_form[form_key].append(
+                {
+                    "component_zh": component["zh"],
+                    "component_en": component["en"],
+                    "part_name": part_name,
+                    "code": code,
+                    "quantity": quantity_from_mark(mark),
+                }
+            )
+
+    db = load_database()
+    model_key = normalize_key(model_name)
+    old_sources = []
+    for key, cfg in list(db["components_by_model"].items()):
+        if cfg.get("model_key") == model_key or normalize_key(key) == model_key:
+            old_sources.append(clean_text(cfg.get("source_file")) or key)
+            del db["components_by_model"][key]
+    for key, cfg in list(db["config_exports_by_model"].items()):
+        if cfg.get("model_key") == model_key or normalize_key(key) == model_key:
+            del db["config_exports_by_model"][key]
+    db["components_by_model"][model_name] = {
+        "model": model_name,
+        "model_key": model_key,
+        "source_file": Path(path).name,
+        "workbook_base64": base64.b64encode(workbook_bytes).decode("ascii"),
+        "forms": components_by_form,
+    }
+    db["config_exports_by_model"][model_name] = {
+        "model": model_name,
+        "model_key": model_key,
+        "source_file": Path(path).name,
+        "workbook_base64": base64.b64encode(workbook_bytes).decode("ascii"),
+        "export_schema_version": EXPORT_SCHEMA_VERSION,
+        "forms": export_forms,
+    }
+    save_database(db)
+    return model_name, sum(len(items) for items in components_by_form.values()), old_sources
+
+
+def register_fonts():
+    for name, path in [
+        ("AppFont", r"C:\Windows\Fonts\ARIALUNI.ttf"),
+        ("AppFont", r"C:\Windows\Fonts\msyh.ttc"),
+        ("AppFont", r"C:\Windows\Fonts\simhei.ttf"),
+    ]:
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont(name, path))
+                return name
+            except Exception:
+                continue
+    return "Helvetica"
+
+
+def embedded_logo_image(width, height):
+    return Image(BytesIO(base64.b64decode(EMBEDDED_LOGO_PNG)), width=width, height=height)
+
+
+def make_paragraph(text, style):
+    escaped = clean_text(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return Paragraph(escaped.replace("\n", "<br/>"), style)
+
+
+def label(zh, en=None, lang="zh"):
+    if lang == "zh":
+        return zh
+    translated = TRANSLATIONS.get(zh, {}).get(lang)
+    if translated:
+        return translated
+    return en or TRANSLATIONS.get(zh, {}).get("en") or zh
+
+
+def tr_text(text, lang, fallback=None):
+    text = clean_text(text)
+    if not text or lang == "zh":
+        return text
+    if text in TRANSLATIONS:
+        return TRANSLATIONS[text].get(lang) or TRANSLATIONS[text].get("en") or text
+    if "\\" in text:
+        return "\\".join(tr_text(part, lang) for part in text.split("\\"))
+    replaced = text
+    for zh in sorted(TRANSLATIONS, key=len, reverse=True):
+        if zh in replaced:
+            replacement = TRANSLATIONS[zh].get(lang) or TRANSLATIONS[zh].get("en") or zh
+            replaced = replaced.replace(zh, replacement)
+    if replaced != text:
+        return replaced
+    if "-" in text:
+        parts = text.split("-")
+        converted = [tr_text(part.strip(), lang) for part in parts]
+        if converted != parts:
+            return " - ".join(converted)
+    return fallback or text
+
+
+def find_export_config(db, model_name):
+    model_key = normalize_key(model_name)
+    for cfg in db.get("config_exports_by_model", {}).values():
+        if cfg.get("model_key") == model_key:
+            return cfg
+    return {}
+
+
+def find_component_config(db, model_name):
+    model_key = normalize_key(model_name)
+    for cfg in db.get("components_by_model", {}).values():
+        if cfg.get("model_key") == model_key:
+            return cfg
+    return {}
+
+
+def find_initial_export_config(model_name):
+    if not INITIAL_DB_FILE.exists() or INITIAL_DB_FILE == DB_FILE:
+        return {}
+    try:
+        with INITIAL_DB_FILE.open("r", encoding="utf-8") as f:
+            initial_db = json.load(f)
+    except Exception:
+        return {}
+    return find_export_config(initial_db, model_name)
+
+
+def find_source_workbook_path(source_file):
+    source_file = clean_text(source_file)
+    if not source_file:
+        return None
+    direct = Path(source_file)
+    if direct.exists():
+        return direct
+    search_roots = []
+    for root in [
+        APP_DIR,
+        APP_DIR.parent,
+        BUNDLE_DIR,
+        DATA_DIR,
+        Path.cwd(),
+        Path.home() / "Documents" / "中联塔机报价单程序",
+    ]:
+        for candidate in [root, root / "参考文件", root / "data"]:
+            if candidate.exists() and candidate not in search_roots:
+                search_roots.append(candidate)
+    for root in search_roots:
+        try:
+            matches = list(root.rglob(source_file)) if root.is_dir() else []
+        except Exception:
+            matches = []
+        if matches:
+            return matches[0]
+    return None
+
+
+def rebuild_export_config_from_workbook_bytes(db, model_name, workbook_bytes, source_file):
+    wb = load_workbook(BytesIO(workbook_bytes), data_only=True)
+    ws = wb.active
+    form_row, form_columns = find_config_form_columns(ws)
+    export_forms = build_config_export_rows(ws, form_row, form_columns)
+    model_key = normalize_key(model_name)
+    db.setdefault("config_exports_by_model", {})[model_name] = {
+        "model": model_name,
+        "model_key": model_key,
+        "source_file": clean_text(source_file),
+        "workbook_base64": base64.b64encode(workbook_bytes).decode("ascii"),
+        "export_schema_version": EXPORT_SCHEMA_VERSION,
+        "forms": export_forms,
+    }
+    save_database(db)
+    return load_database()
+
+
+def ensure_export_config(db, model_name):
+    cfg = find_export_config(db, model_name)
+    if cfg and int(cfg.get("export_schema_version", 0) or 0) >= EXPORT_SCHEMA_VERSION:
+        return db, cfg
+
+    if cfg:
+        workbook_base64 = clean_text(cfg.get("workbook_base64", ""))
+        if workbook_base64:
+            try:
+                refreshed_db = rebuild_export_config_from_workbook_bytes(
+                    db,
+                    model_name,
+                    base64.b64decode(workbook_base64),
+                    cfg.get("source_file", ""),
+                )
+                rebuilt_cfg = find_export_config(refreshed_db, model_name)
+                if rebuilt_cfg:
+                    return refreshed_db, rebuilt_cfg
+            except Exception:
+                pass
+
+    initial_cfg = find_initial_export_config(model_name)
+    if initial_cfg and int(initial_cfg.get("export_schema_version", 0) or 0) >= EXPORT_SCHEMA_VERSION:
+        db.setdefault("config_exports_by_model", {})[model_name] = initial_cfg
+        save_database(db)
+        refreshed_db = load_database()
+        cfg = find_export_config(refreshed_db, model_name)
+        if cfg:
+            return refreshed_db, cfg
+
+    component_cfg = find_component_config(db, model_name)
+    workbook_base64 = clean_text(component_cfg.get("workbook_base64", ""))
+    if workbook_base64:
+        try:
+            refreshed_db = rebuild_export_config_from_workbook_bytes(
+                db,
+                model_name,
+                base64.b64decode(workbook_base64),
+                component_cfg.get("source_file", ""),
+            )
+            cfg = find_export_config(refreshed_db, model_name)
+            if cfg:
+                return refreshed_db, cfg
+        except Exception:
+            pass
+
+    source_path = find_source_workbook_path(component_cfg.get("source_file", ""))
+    if not source_path:
+        raise ValueError("当前机型已导入配置表摘要，但旧版本没有保存原 Excel 内容，且找不到原配置表文件，无法自动生成清单数据。请把原配置表文件放回软件目录或参考文件目录。")
+
+    import_tower_config_file(source_path, model_name=model_name)
+    refreshed_db = load_database()
+    cfg = find_export_config(refreshed_db, model_name)
+    if not cfg:
+        raise ValueError("已找到原配置表，但自动生成清单数据失败。")
+    return refreshed_db, cfg
+
+
+def make_config_list_excel(db, model_name, install_form, list_type, output_path):
+    try:
+        db, cfg = ensure_export_config(db, model_name)
+    except ValueError:
+        if list_type == "basic":
+            return make_basic_list_from_component_summary(db, model_name, install_form, output_path)
+        raise
+    form_key = normalize_form(install_form)
+    form_data = cfg.get("forms", {}).get(form_key)
+    if not form_data:
+        for key, value in cfg.get("forms", {}).items():
+            normalized_key = normalize_form(key)
+            if normalized_key in form_key or form_key in normalized_key:
+                form_data = value
+                break
+    if not form_data:
+        available = "、".join(cfg.get("forms", {}).keys()) or "无"
+        raise ValueError(f"当前安装形式没有可导出的配置表数据。当前选择：{install_form}；配置表中可用安装形式：{available}")
+
+    row_key = "basic_rows" if list_type == "basic" else "option_rows"
+    rows = form_data.get(row_key, [])
+    if not rows:
+        raise ValueError("没有符合条件的行项目可导出。")
+
+    title = "基本配置清单" if list_type == "basic" else "增减配清单"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = title
+    header_rows = form_data.get("headers", [])
+    if list_type == "basic":
+        header_rows = header_rows[2:]
+        display_header_rows = []
+        for idx, row in enumerate(header_rows):
+            display_header_rows.append((["序号"] if idx == 0 else [""]) + row[1:])
+        display_rows = [[idx] + row[1:] for idx, row in enumerate(rows, start=1)]
+    else:
+        display_header_rows = header_rows
+        display_rows = rows
+    max_cols = max([len(row) for row in display_header_rows + display_rows] or [1])
+
+    ws.append([title])
+    if list_type == "basic":
+        ws.append([f"产品型号：{model_name}", f"安装形式：{install_form}"])
+    else:
+        ws.append([f"产品型号：{model_name}", f"安装形式：{install_form}", f"来源配置表：{cfg.get('source_file', '')}"])
+    ws.append([])
+    for row in display_header_rows:
+        ws.append(row)
+    for row in display_rows:
+        ws.append(row)
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max_cols)
+    merge_key = "basic_merges" if list_type == "basic" else "option_merges"
+    for merged in form_data.get(merge_key, []):
+        if list_type == "basic":
+            if int(merged.get("min_row", 0)) <= 2:
+                continue
+            if int(merged.get("max_row", 0)) <= 4:
+                continue
+            if int(merged.get("min_col", 0)) <= 1:
+                continue
+            min_row = int(merged.get("min_row", 0)) + 1
+            max_row = int(merged.get("max_row", 0)) + 1
+            min_col = int(merged.get("min_col", 0))
+            max_col = int(merged.get("max_col", 0))
+        else:
+            min_row = int(merged.get("min_row", 0)) + 3
+            max_row = int(merged.get("max_row", 0)) + 3
+            min_col = int(merged.get("min_col", 0))
+            max_col = int(merged.get("max_col", 0))
+        if min_row and max_row and min_col and max_col and (min_row != max_row or min_col != max_col):
+            ws.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+    if list_type == "basic" and ws.max_row >= 5:
+        for col_idx in range(1, max_cols + 1):
+            top_value = clean_text(ws.cell(4, col_idx).value)
+            bottom_value = clean_text(ws.cell(5, col_idx).value)
+            ws.cell(4, col_idx).value = bottom_value or top_value
+            ws.cell(5, col_idx).value = ""
+            ws.merge_cells(start_row=4, start_column=col_idx, end_row=5, end_column=col_idx)
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A1"].alignment = Alignment(horizontal="center")
+    for row in ws.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+    for col_idx in range(1, max_cols + 1):
+        width = 12
+        for row_idx in range(1, ws.max_row + 1):
+            value = clean_text(ws.cell(row_idx, col_idx).value)
+            if value:
+                width = max(width, min(40, len(value) + 2))
+        ws.column_dimensions[column_label(col_idx)].width = width
+    ws.freeze_panes = "A4"
+    return save_workbook_without_overwrite_conflict(wb, output_path)
+
+
+def make_basic_list_from_component_summary(db, model_name, install_form, output_path):
+    components = select_components(db, model_name, install_form)
+    if not components:
+        raise ValueError("当前机型已导入配置表摘要，但没有可生成基本配置清单的主要部件数据。")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "基本配置清单"
+    ws.append(["基本配置清单"])
+    ws.append([f"产品型号：{model_name}", f"安装形式：{install_form}"])
+    ws.append([])
+    ws.append(["序号", "部件", "名称", "代号", "数量", "标配"])
+    for idx, item in enumerate(components, start=1):
+        ws.append([
+            idx,
+            item.get("component_zh", ""),
+            item.get("part_name", ""),
+            item.get("code", ""),
+            item.get("quantity", ""),
+            "●",
+        ])
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A1"].alignment = Alignment(horizontal="center")
+    for row in ws.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+    for col_idx in range(1, 7):
+        width = 12
+        for row_idx in range(1, ws.max_row + 1):
+            value = clean_text(ws.cell(row_idx, col_idx).value)
+            if value:
+                width = max(width, min(40, len(value) + 2))
+        ws.column_dimensions[column_label(col_idx)].width = width
+    return save_workbook_without_overwrite_conflict(wb, output_path)
+
+
+def tower_type_text(tower_type, lang):
+    if lang == "zh":
+        return tower_type.get("zh", "")
+    if lang == "en":
+        return tower_type.get("en", "") or tr_text(tower_type.get("zh", ""), lang)
+    return tr_text(tower_type.get("zh", ""), lang, tower_type.get("en", ""))
+
+
+def mm_value(value, suffix="m"):
+    text = clean_text(value)
+    if not text:
+        return ""
+    return text if re.search(r"[a-zA-Z米mM]$", text) else f"{text}{suffix}"
+
+
+def select_components(db, model_name, install_form):
+    def visible(items):
+        return [
+            item
+            for item in items
+            if not should_skip_component(" ".join([item.get("component_zh", ""), item.get("part_name", ""), item.get("code", "")]))
+        ]
+
+    model_key = normalize_key(model_name)
+    form_key = normalize_form(install_form)
+    for cfg in db.get("components_by_model", {}).values():
+        if cfg.get("model_key") != model_key:
+            continue
+        forms = cfg.get("forms", {})
+        if form_key in forms:
+            return visible(forms[form_key])
+        for saved_form, items in forms.items():
+            if form_key in saved_form or saved_form in form_key:
+                return visible(items)
+    return []
+
+
+def change_type_text(option, lang):
+    code = clean_text(option.get("change_type_code"))
+    if code == "20":
+        return label("减配", "Deduction", lang)
+    return label("增配", "Addition", lang)
+
+
+@dataclass
+class QuoteInput:
+    language: str
+    model_name: str
+    install_form: str
+    quote_date: str
+    trade_term: str
+    trade_place: str
+    price: str
+    currency: str
+    header_address: str
+    quote_company: str
+    quote_person: str
+    quote_phone: str
+    quote_email: str
+    payment: str
+    delivery: str
+    validity: str
+    transportation: str
+    warranty: str
+    others: str
+    selected_option_indexes: list
+    selected_option_quantities: dict
+
+
+def make_pdf(db, quote, output_path):
+    ensure_dirs()
+    lang = quote.language
+    font_name = register_fonts()
+    styles = getSampleStyleSheet()
+    normal = ParagraphStyle("normal", parent=styles["Normal"], fontName=font_name, fontSize=7.6, leading=9.2)
+    small = ParagraphStyle("small", parent=normal, fontSize=6.6, leading=7.8)
+    address_style = ParagraphStyle("address", parent=normal, fontSize=7.4, leading=8.8)
+    title = ParagraphStyle("title", parent=normal, alignment=TA_CENTER, fontSize=15, leading=18)
+    section = ParagraphStyle("section", parent=normal, fontSize=8.6, leading=10, alignment=TA_LEFT)
+    center = ParagraphStyle("center", parent=normal, alignment=TA_CENTER)
+    left = ParagraphStyle("left", parent=normal, alignment=TA_LEFT)
+
+    doc = BaseDocTemplate(
+        str(output_path),
+        pagesize=A4,
+        leftMargin=17 * mm,
+        rightMargin=17 * mm,
+        topMargin=12 * mm,
+        bottomMargin=10 * mm,
+    )
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="normal")
+    doc.addPageTemplates([PageTemplate(id="quotation", frames=[frame])])
+    width = doc.width
+
+    product = db["products"].get(quote.model_name, {})
+    product_code = product.get("product_code", "")
+    forms = db.get("forms_by_code", {}).get(product_code, [])
+    form = next((item for item in forms if normalize_form(item.get("install_form")) == normalize_form(quote.install_form)), {})
+    tower_type = product.get("tower_type") or detect_tower_type(quote.model_name)
+    max_load = product.get("max_load") or detect_max_load(quote.model_name)
+    options = db.get("options_by_code", {}).get(product_code, [])
+    selected_options = [(i, options[i]) for i in quote.selected_option_indexes if i < len(options)]
+    components = select_components(db, quote.model_name, quote.install_form)
+
+    story = []
+    company_address = quote.header_address
+    logo = embedded_logo_image(width=36 * mm, height=11 * mm)
+    header = Table(
+        [
+            [logo, make_paragraph(company_address, address_style)],
+            [make_paragraph(label("中联塔机报价单", "TOWER CRANE QUOTATION", lang), title), ""],
+            [make_paragraph(f"{label('报价日期', 'Date', lang)}: {quote.quote_date}", section), ""],
+        ],
+        colWidths=[39 * mm, width - 39 * mm],
+    )
+    header.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.8, colors.black),
+                ("SPAN", (0, 1), (1, 1)),
+                ("SPAN", (0, 2), (1, 2)),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BACKGROUND", (0, 1), (1, 1), colors.whitesmoke),
+            ]
+        )
+    )
+    story.append(header)
+
+    quote_info_rows = [
+        [
+            make_paragraph(label("报价单位", "Quotation unit", lang), center),
+            make_paragraph(tr_text(quote.quote_company, lang), left),
+            make_paragraph(label("报价人", "Quoted by", lang), center),
+            make_paragraph(quote.quote_person, left),
+        ],
+        [
+            make_paragraph(label("联系邮箱", "Email", lang), center),
+            make_paragraph(quote.quote_email, left),
+            make_paragraph(label("联系电话", "Phone", lang), center),
+            make_paragraph(quote.quote_phone, left),
+        ],
+    ]
+    quote_info = Table(quote_info_rows, colWidths=[26 * mm, width - 102 * mm, 26 * mm, 50 * mm])
+    quote_info.setStyle(table_style())
+    story.append(quote_info)
+
+    unit_price = f"{quote.trade_term} {tr_text(quote.trade_place, lang)} ({label('价格', 'Price', lang)}: {quote.currency} {format_number(quote.price)})"
+    basic_rows = [
+        [make_paragraph(label("基本参数", "BASIC PARAMETER", lang), section), "", "", ""],
+        [make_paragraph(label("产品型号", "Model", lang), center), make_paragraph(quote.model_name, center), make_paragraph(label("塔机类型", "Type", lang), center), make_paragraph(tower_type_text(tower_type, lang), center)],
+        [make_paragraph(label("独立高度", "HUH", lang), center), make_paragraph(mm_value(form.get("height")), center), make_paragraph(label("最大臂长", "Max jib length", lang), center), make_paragraph(mm_value(form.get("jib_length") or product.get("default_jib_length")), center)],
+        [make_paragraph(label("最大起重量", "Max load", lang), center), make_paragraph(max_load, center), make_paragraph(label("安装形式", "Installation form", lang), center), make_paragraph(tr_text(quote.install_form, lang), center)],
+        [make_paragraph(label("容绳量", "Rope capacity", lang), center), make_paragraph(mm_value(form.get("rope_capacity")), center), make_paragraph(label("塔身种类", "Mast type", lang), center), make_paragraph(tr_text(product.get("mast_type", ""), lang), center)],
+        [make_paragraph(label("单价", "UNIT PRICE", lang), section), make_paragraph(unit_price, section), "", ""],
+    ]
+    basic = Table(basic_rows, colWidths=[38 * mm, 48 * mm, 38 * mm, width - 124 * mm])
+    basic.setStyle(table_style([(0, 0, 3, 0), (1, 5, 3, 5)]))
+    story.append(basic)
+
+    component_rows = [[make_paragraph(label("主要部件配置", "MAIN COMPONENT CONFIGURATION", lang), section), "", "", ""]]
+    component_rows.append(
+        [
+            make_paragraph("No.", center),
+            make_paragraph(label("部件名称", "Component", lang), center),
+            make_paragraph(label("代号", "Code", lang), center),
+            make_paragraph(label("数量", "Qty", lang), center),
+        ]
+    )
+    if components:
+        for idx, item in enumerate(components, start=1):
+            component_name = tr_text(item.get("component_zh", ""), lang, item.get("component_en", ""))
+            part_name = tr_text(item.get("part_name", ""), lang)
+            display = component_name if part_name in ("", component_name) else f"{component_name} - {part_name}"
+            component_rows.append(
+                [
+                    clean_text(idx),
+                    make_paragraph(display, left),
+                    make_paragraph(tr_text(item.get("code", ""), lang), left),
+                    make_paragraph(item.get("quantity", "1"), center),
+                ]
+            )
+    else:
+        component_rows.append(["", make_paragraph(label("未导入该机型配置表。", "No configuration workbook imported for this model.", lang), left), "", ""])
+    comp_table = Table(component_rows, colWidths=[10 * mm, width - 80 * mm, 50 * mm, 20 * mm], repeatRows=2)
+    comp_table.setStyle(table_style([(0, 0, 3, 0), (1, len(component_rows) - 1, 3, len(component_rows) - 1)] if not components else [(0, 0, 3, 0)]))
+    story.append(comp_table)
+
+    option_rows = [[make_paragraph(label("增减配置", "ADDITIONS / DEDUCTIONS", lang), section), "", "", "", ""]]
+    option_rows.append(
+        [
+            make_paragraph("No.", center),
+            make_paragraph(label("类型", "Type", lang), center),
+            make_paragraph(label("部件代号", "Part code", lang), center),
+            make_paragraph(label("增减部件", "Part", lang), center),
+            make_paragraph(label("数量", "Qty", lang), center),
+        ]
+    )
+    if selected_options:
+        for idx, (option_index, item) in enumerate(selected_options, start=1):
+            qty = quote.selected_option_quantities.get(str(option_index), "1")
+            option_rows.append(
+                [
+                    clean_text(idx),
+                    make_paragraph(change_type_text(item, lang), center),
+                    make_paragraph(tr_text(item.get("part_code", ""), lang), left),
+                    make_paragraph(tr_text(item.get("part_name", ""), lang), left),
+                    make_paragraph(qty, center),
+                ]
+            )
+    else:
+        option_rows.append(["", make_paragraph(label("未选择增减配置。", "No additions or deductions selected.", lang), left), "", "", ""])
+    option_table = Table(option_rows, colWidths=[10 * mm, 26 * mm, 42 * mm, width - 92 * mm, 14 * mm], repeatRows=2)
+    option_table.setStyle(table_style([(0, 0, 4, 0), (1, len(option_rows) - 1, 4, len(option_rows) - 1)] if not selected_options else [(0, 0, 4, 0)]))
+    story.append(option_table)
+
+    terms_rows = [
+        [make_paragraph(label("交易条款及其他信息", "TRADE CLAUSE & OTHER INFORMATION", lang), section), ""],
+        [make_paragraph(label("付款方式", "Payment item", lang), center), make_paragraph(tr_text(quote.payment, lang), left)],
+        [make_paragraph(label("交货期", "Delivery time", lang), center), make_paragraph(tr_text(quote.delivery, lang), left)],
+        [make_paragraph(label("报价有效期", "Quotation validity", lang), center), make_paragraph(tr_text(quote.validity, lang), left)],
+        [make_paragraph(label("运输方案", "Transportation", lang), center), make_paragraph(tr_text(quote.transportation, lang), left)],
+        [make_paragraph(label("质保期", "Warranty", lang), center), make_paragraph(tr_text(quote.warranty, lang), small)],
+        [make_paragraph(label("其他", "Others", lang), center), make_paragraph(tr_text(quote.others, lang), left)],
+    ]
+    terms = Table(terms_rows, colWidths=[40 * mm, width - 40 * mm])
+    terms.setStyle(table_style([(0, 0, 1, 0)]))
+    story.append(terms)
+
+    doc.build(story)
+
+
+def table_style(spans=None):
+    commands = [
+        ("GRID", (0, 0), (-1, -1), 0.55, colors.black),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+    ]
+    for c1, r1, c2, r2 in spans or []:
+        commands.append(("SPAN", (c1, r1), (c2, r2)))
+    return TableStyle(commands)
+
+
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.canvas = Canvas(self, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient=VERTICAL, command=self.canvas.yview)
+        self.inner = ttk.Frame(self.canvas)
+        self.inner.bind("<Configure>", lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.window_id = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(self.window_id, width=e.width))
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        self.scrollbar.pack(side=RIGHT, fill="y")
+
+
+class QuotationApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("中联塔机报价单生成软件")
+        self.root.geometry("1180x760")
+        ensure_dirs()
+        self.db = load_database()
+        self.user_settings = load_user_settings()
+        self.language_label = StringVar(value="中文")
+        self.model_var = StringVar()
+        self.form_var = StringVar()
+        self.date_var = StringVar(value=date.today().isoformat())
+        self.trade_term = StringVar(value="FOB")
+        self.trade_place = StringVar(value="")
+        self.price = StringVar(value="")
+        self.currency = StringVar(value="CNY")
+        self.header_address = StringVar(value=self.user_settings["header_address"])
+        self.quote_company = StringVar(value=self.user_settings["quote_company"])
+        self.quote_person = StringVar(value=self.user_settings["quote_person"])
+        self.quote_phone = StringVar(value=self.user_settings["quote_phone"])
+        self.quote_email = StringVar(value=self.user_settings["quote_email"])
+        self.option_vars = []
+        self.option_qty_vars = []
+        self.term_widgets = {}
+        self.research_operator_id = ""
+        self.research_operation_time = ""
+        self.build_ui()
+        self.refresh_models()
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def build_ui(self):
+        main = ttk.Frame(self.root, padding=12)
+        main.pack(fill=BOTH, expand=True)
+        ttk.Label(main, text="中联塔机报价单生成软件", font=("Microsoft YaHei UI", 18, "bold")).pack(anchor="w")
+
+        toolbar = ttk.Frame(main)
+        toolbar.pack(fill="x", pady=(10, 8))
+        ttk.Button(toolbar, text="生成报价 PDF", command=self.on_generate).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(toolbar, text="生成基本配置清单", command=lambda: self.on_generate_config_list("basic")).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(toolbar, text="生成增减配清单", command=lambda: self.on_generate_config_list("option")).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(toolbar, text="打开输出文件夹", command=lambda: os.startfile(OUTPUT_DIR)).pack(side=LEFT)
+
+        settings_row = ttk.Frame(main)
+        settings_row.pack(fill="x")
+        quote_info = ttk.LabelFrame(settings_row, text="报价单信息", padding=10)
+        quote_info.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
+        product_info = ttk.LabelFrame(settings_row, text="产品信息", padding=10)
+        product_info.pack(side=LEFT, fill="both", expand=True)
+
+        self.language_combo = ttk.Combobox(quote_info, textvariable=self.language_label, values=list(LANG_OPTIONS), width=12, state="readonly")
+        self.term_combo = ttk.Combobox(quote_info, textvariable=self.trade_term, values=["FOB", "CIF", "EXZ", "DDP", "DAP"], width=10, state="readonly")
+        self.currency_combo = ttk.Combobox(quote_info, textvariable=self.currency, values=["CNY", "USD", "EUR"], width=10, state="readonly")
+        quote_fields = [
+            ("报价单语言", self.language_combo, 0, 0),
+            ("报价日期", ttk.Entry(quote_info, textvariable=self.date_var, width=14), 0, 2),
+            ("贸易术语", self.term_combo, 0, 4),
+            ("交易地点", ttk.Entry(quote_info, textvariable=self.trade_place, width=18), 0, 6),
+            ("价格", ttk.Entry(quote_info, textvariable=self.price, width=14), 1, 0),
+            ("价格单位", self.currency_combo, 1, 2),
+            ("报价单位", ttk.Entry(quote_info, textvariable=self.quote_company, width=38), 1, 4),
+            ("报价人", ttk.Entry(quote_info, textvariable=self.quote_person, width=14), 2, 0),
+            ("联系电话", ttk.Entry(quote_info, textvariable=self.quote_phone, width=18), 2, 2),
+            ("联系邮箱", ttk.Entry(quote_info, textvariable=self.quote_email, width=30), 3, 0),
+            ("公司地址", ttk.Entry(quote_info, textvariable=self.header_address, width=64), 4, 0),
+        ]
+        for label_text, widget, row, col in quote_fields:
+            ttk.Label(quote_info, text=label_text).grid(row=row, column=col, sticky="w", padx=(0, 4), pady=3)
+            span = 7 if label_text in ("公司地址", "联系邮箱") else (3 if label_text == "报价单位" else 1)
+            widget.grid(row=row, column=col + 1, columnspan=span, sticky="we", padx=(0, 10), pady=3)
+        quote_info.columnconfigure(7, weight=1)
+
+        self.model_combo = ttk.Combobox(product_info, textvariable=self.model_var, width=28, state="readonly")
+        self.form_combo = ttk.Combobox(product_info, textvariable=self.form_var, width=24, state="readonly")
+        ttk.Label(product_info, text="产品型号").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=4)
+        self.model_combo.grid(row=0, column=1, sticky="we", pady=4)
+        ttk.Label(product_info, text="安装形式").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=4)
+        self.form_combo.grid(row=1, column=1, sticky="we", pady=4)
+        product_info.columnconfigure(1, weight=1)
+        self.model_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_forms())
+        self.form_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_screen())
+
+        terms = ttk.LabelFrame(main, text="交易条款及其他信息", padding=10)
+        terms.pack(fill="x", pady=(10, 0))
+        defaults = {
+            "payment": "合同签订后支付30%作为定金，发货前付清剩余70%合同款。",
+            "delivery": "收到定金后90日内发货。",
+            "validity": "30天",
+            "transportation": "以最终发运方案为准。",
+            "warranty": "自提单之日起保修期：钢结构12个月；机构12个月；电气部件12个月。易损件除外。",
+            "others": "报价含首次安装指导服务费用。",
+        }
+        term_labels = [
+            ("payment", "付款方式"),
+            ("delivery", "交货期"),
+            ("validity", "报价有效期"),
+            ("transportation", "运输方案"),
+            ("warranty", "质保期"),
+            ("others", "其他"),
+        ]
+        for idx, (key, text) in enumerate(term_labels):
+            row = idx // 3
+            col = (idx % 3) * 2
+            ttk.Label(terms, text=text).grid(row=row, column=col, sticky="nw", padx=(0, 4), pady=4)
+            widget = Text(terms, width=34, height=2, wrap="word")
+            widget.insert("1.0", defaults[key])
+            widget.grid(row=row, column=col + 1, sticky="we", padx=(0, 12), pady=4)
+            self.term_widgets[key] = widget
+
+        body = ttk.PanedWindow(main, orient="horizontal")
+        body.pack(fill=BOTH, expand=True, pady=10)
+        left = ttk.Frame(body)
+        right = ttk.Frame(body)
+        body.add(left, weight=1)
+        body.add(right, weight=2)
+
+        info_box = ttk.LabelFrame(left, text="产品基本信息", padding=10)
+        info_box.pack(fill=BOTH, expand=True)
+        self.info_label = ttk.Label(info_box, text="", justify=LEFT)
+        self.info_label.pack(anchor="nw")
+
+        option_box = ttk.LabelFrame(right, text="可选增减配置（报价单不显示价格）", padding=10)
+        option_box.pack(fill=BOTH, expand=True)
+        self.option_frame = ScrollableFrame(option_box)
+        self.option_frame.pack(fill=BOTH, expand=True)
+
+        bottom_bar = ttk.Frame(main)
+        bottom_bar.pack(side="bottom", fill="x", anchor="w")
+        ttk.Button(bottom_bar, text="研发配置导入模块", command=self.open_research_import_module).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(bottom_bar, text="查看机型配置表导入状态", command=self.show_config_status).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(bottom_bar, text="配置导入修改记录", command=self.show_change_log).pack(side=LEFT)
+
+    def current_product(self):
+        return self.db.get("products", {}).get(self.model_var.get(), {})
+
+    def current_forms(self):
+        product_code = self.current_product().get("product_code", "")
+        return self.db.get("forms_by_code", {}).get(product_code, [])
+
+    def current_form(self):
+        wanted = normalize_form(self.form_var.get())
+        for form in self.current_forms():
+            if normalize_form(form.get("install_form")) == wanted:
+                return form
+        return {}
+
+    def current_options(self):
+        product_code = self.current_product().get("product_code", "")
+        return self.db.get("options_by_code", {}).get(product_code, [])
+
+    def refresh_models(self):
+        models = sorted(model for model in self.db.get("products", {}) if is_visible_product_model(model))
+        self.model_combo["values"] = models
+        if models and self.model_var.get() not in models:
+            self.model_var.set(models[0])
+        elif not models:
+            self.model_var.set("")
+        self.refresh_forms()
+
+    def refresh_forms(self):
+        forms = [item.get("install_form", "") for item in self.current_forms() if item.get("install_form")]
+        self.form_combo["values"] = forms
+        if forms and self.form_var.get() not in forms:
+            self.form_var.set(forms[0])
+        elif not forms:
+            self.form_var.set("")
+        self.refresh_screen()
+
+    def refresh_screen(self):
+        self.refresh_info()
+        self.refresh_options()
+
+    def refresh_info(self):
+        product = self.current_product()
+        form = self.current_form()
+        if not product:
+            self.info_label.config(text="请先导入增减配价格表，系统会从 D列=B1 的数据识别机型。")
+            return
+        type_info = product.get("tower_type", {})
+        text = (
+            f"产品编码: {product.get('product_code', '')}\n"
+            f"塔机类型: {type_info.get('zh', '')}\n"
+            f"独立高度: {mm_value(form.get('height'))}\n"
+            f"最大臂长: {mm_value(form.get('jib_length') or product.get('default_jib_length'))}\n"
+            f"最大起重量: {product.get('max_load', '')}\n"
+            f"容绳量: {mm_value(form.get('rope_capacity'))}\n"
+            f"塔身种类: {product.get('mast_type', '')}\n"
+            f"配置表主要部件: {len(select_components(self.db, self.model_var.get(), self.form_var.get()))} 条"
+        )
+        self.info_label.config(text=text)
+
+    def refresh_options(self):
+        for child in self.option_frame.inner.winfo_children():
+            child.destroy()
+        self.option_vars = []
+        self.option_qty_vars = []
+        options = self.current_options()
+        if not options:
+            ttk.Label(self.option_frame.inner, text="当前机型暂无增减配信息。").pack(anchor="w")
+            return
+        header = ttk.Frame(self.option_frame.inner)
+        header.pack(fill="x", pady=(0, 4))
+        ttk.Label(header, text="选择", width=6).pack(side=LEFT)
+        ttk.Label(header, text="数量", width=8).pack(side=LEFT, padx=(0, 6))
+        ttk.Label(header, text="增减配项目").pack(side=LEFT)
+        for option in options:
+            row = ttk.Frame(self.option_frame.inner)
+            row.pack(fill="x", anchor="w", pady=2)
+            var = BooleanVar(value=False)
+            qty_var = StringVar(value="1")
+            self.option_vars.append(var)
+            self.option_qty_vars.append(qty_var)
+            action = "减配" if clean_text(option.get("change_type_code")) == "20" else "增配"
+            text = f"{action} | {option.get('category', '')} | {option.get('part_code', '')} | {option.get('part_name', '')}"
+            ttk.Checkbutton(row, variable=var).pack(side=LEFT)
+            ttk.Spinbox(row, from_=1, to=999, textvariable=qty_var, width=6).pack(side=LEFT, padx=(0, 8))
+            ttk.Label(row, text=text).pack(side=LEFT, anchor="w")
+
+    def reload_db(self):
+        self.db = load_database()
+        self.refresh_models()
+
+    def open_research_import_module(self):
+        password_window = Toplevel(self.root)
+        password_window.title("研发配置导入模块")
+        password_window.geometry("420x240")
+        password_window.transient(self.root)
+        password_window.grab_set()
+        frame = ttk.Frame(password_window, padding=14)
+        frame.pack(fill=BOTH, expand=True)
+
+        ttk.Label(frame, text="工号").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=5)
+        operator_var = StringVar(value=self.research_operator_id)
+        operator_entry = ttk.Entry(frame, textvariable=operator_var, width=30)
+        operator_entry.grid(row=0, column=1, sticky="we", pady=5)
+
+        ttk.Label(frame, text="时间").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=5)
+        time_var = StringVar(value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        time_entry = ttk.Entry(frame, textvariable=time_var, width=30)
+        time_entry.grid(row=1, column=1, sticky="we", pady=5)
+
+        ttk.Label(frame, text="密码").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=5)
+        password_var = StringVar()
+        entry = ttk.Entry(frame, textvariable=password_var, show="*", width=28)
+        entry.grid(row=2, column=1, sticky="we", pady=5)
+        frame.columnconfigure(1, weight=1)
+        operator_entry.focus_set()
+
+        def verify():
+            if not clean_text(operator_var.get()):
+                messagebox.showerror("缺少工号", "请输入工号。", parent=password_window)
+                return
+            if not clean_text(time_var.get()):
+                messagebox.showerror("缺少时间", "请输入时间。", parent=password_window)
+                return
+            if password_var.get() != "zlzk.123456789":
+                messagebox.showerror("密码错误", "密码不正确，无法进入研发配置导入模块。", parent=password_window)
+                return
+            self.research_operator_id = clean_text(operator_var.get())
+            self.research_operation_time = clean_text(time_var.get())
+            password_window.destroy()
+            self.show_research_import_window()
+
+        buttons = ttk.Frame(frame)
+        buttons.grid(row=3, column=0, columnspan=2, sticky="w", pady=(12, 0))
+        ttk.Button(buttons, text="进入", command=verify).pack(side=LEFT)
+        ttk.Button(buttons, text="取消", command=password_window.destroy).pack(side=LEFT, padx=(8, 0))
+        for widget in (operator_entry, time_entry, entry):
+            widget.bind("<Return>", lambda _e: verify())
+
+    def show_research_import_window(self):
+        window = Toplevel(self.root)
+        window.title("研发配置导入模块")
+        window.geometry("520x220")
+        window.transient(self.root)
+        frame = ttk.Frame(window, padding=16)
+        frame.pack(fill=BOTH, expand=True)
+        ttk.Label(frame, text="研发配置导入模块", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(0, 10))
+        ttk.Label(frame, text=f"当前工号：{self.research_operator_id}    记录时间：{self.research_operation_time}", foreground="#555").pack(anchor="w", pady=(0, 8))
+        ttk.Label(frame, text="以下功能用于维护软件内置数据库，请谨慎操作。", foreground="#555").pack(anchor="w", pady=(0, 12))
+        ttk.Button(frame, text="导入增减配价格表", command=self.on_import_price).pack(fill="x", pady=4)
+        ttk.Button(frame, text="导入产品安装参数表", command=self.on_import_product_cfg).pack(fill="x", pady=4)
+        ttk.Button(frame, text="导入当前机型配置表", command=self.on_import_tower_config).pack(fill="x", pady=4)
+
+    def record_change(self, content):
+        append_change_log(self.research_operator_id, self.research_operation_time, content)
+
+    def on_import_price(self):
+        path = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xlsm")])
+        if not path:
+            return
+        try:
+            products, options = import_price_file(path)
+            self.record_change(f"导入增减配价格表：{Path(path).name}；识别机型 {products} 个，增减配 {options} 条。")
+            self.reload_db()
+            messagebox.showinfo("导入完成", f"已导入 {products} 个机型、{options} 条增减配。")
+        except Exception as exc:
+            messagebox.showerror("导入失败", str(exc))
+
+    def on_import_product_cfg(self):
+        path = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xlsm")])
+        if not path:
+            return
+        try:
+            count = import_product_cfg_file(path)
+            self.record_change(f"导入产品安装参数表：{Path(path).name}；导入/更新安装形式参数 {count} 条。")
+            self.reload_db()
+            messagebox.showinfo("导入完成", f"已导入 {count} 条安装形式/塔高/臂长/容绳量。")
+        except Exception as exc:
+            messagebox.showerror("导入失败", str(exc))
+
+    def on_import_tower_config(self):
+        products = sorted(model for model in self.db.get("products", {}) if is_visible_product_model(model))
+        if not products:
+            messagebox.showinfo("缺少机型", "请先导入增减配价格表，系统识别到产品型号后再导入机型配置表。")
+            return
+
+        dialog = Toplevel(self.root)
+        dialog.title("选择配置表所属机型")
+        dialog.geometry("420x150")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        frame = ttk.Frame(dialog, padding=14)
+        frame.pack(fill=BOTH, expand=True)
+        ttk.Label(frame, text="请选择这张配置表对应的产品型号：").pack(anchor="w")
+        selected_model = StringVar(value=self.model_var.get() if self.model_var.get() in products else products[0])
+        combo = ttk.Combobox(frame, textvariable=selected_model, values=products, state="readonly", width=38)
+        combo.pack(fill="x", pady=(8, 12))
+
+        def choose_file():
+            model_name = selected_model.get()
+            dialog.destroy()
+            path = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xlsm")])
+            if not path:
+                return
+            try:
+                model, count, old_sources = import_tower_config_file(path, model_name=model_name)
+                action = "覆盖旧配置表" if old_sources else "新增配置表"
+                old_text = f"；旧文件：{'、'.join(old_sources)}" if old_sources else ""
+                self.record_change(f"导入当前机型配置表：{model}；{action}；新文件：{Path(path).name}；主要部件 {count} 条{old_text}。")
+                self.reload_db()
+                messagebox.showinfo("导入完成", f"已将配置表导入到 {model}，共 {count} 条主要部件配置。{action}。")
+            except Exception as exc:
+                messagebox.showerror("导入失败", str(exc))
+
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="下一步：选择配置表文件", command=choose_file).pack(side=LEFT)
+        ttk.Button(buttons, text="取消", command=dialog.destroy).pack(side=LEFT, padx=(8, 0))
+
+    def show_config_status(self):
+        products = {
+            model: product
+            for model, product in self.db.get("products", {}).items()
+            if is_visible_product_model(model)
+        }
+        configs = self.db.get("components_by_model", {})
+        if not products:
+            messagebox.showinfo("配置表导入状态", "请先导入增减配价格表，系统识别到产品型号后再查看状态。")
+            return
+
+        window = Toplevel(self.root)
+        window.title("机型配置表导入状态")
+        window.geometry("1040x460")
+        wrapper = ttk.Frame(window, padding=10)
+        wrapper.pack(fill=BOTH, expand=True)
+        imported_count = sum(
+            1
+            for model_name in products
+            if any(cfg.get("model_key") == normalize_key(model_name) for cfg in configs.values())
+        )
+        ttk.Label(
+            wrapper,
+            text=f"配置表导入状态：共 {len(products)} 个机型，已导入 {imported_count} 个，未导入 {len(products) - imported_count} 个。",
+            font=("Microsoft YaHei UI", 10, "bold"),
+        ).pack(anchor="w")
+        ttk.Label(
+            wrapper,
+            text="说明：配置表按产品型号严格匹配。例如 R220-10 的配置表不会用于 R220-10RA(CE)。",
+            foreground="#555",
+        ).pack(anchor="w", pady=(0, 8))
+
+        columns = ("model", "code", "status", "source", "forms", "components")
+        tree = ttk.Treeview(wrapper, columns=columns, show="headings", height=14)
+        headings = {
+            "model": "产品型号",
+            "code": "产品编码",
+            "status": "配置表状态",
+            "source": "导入文件",
+            "forms": "匹配安装形式",
+            "components": "可见主要部件",
+        }
+        widths = {
+            "model": 170,
+            "code": 100,
+            "status": 110,
+            "source": 220,
+            "forms": 200,
+            "components": 110,
+        }
+        for col in columns:
+            tree.heading(col, text=headings[col])
+            tree.column(col, width=widths[col], anchor="w")
+
+        cfg_by_key = {cfg.get("model_key"): cfg for cfg in configs.values()}
+        for model_name in sorted(products):
+            product = products[model_name]
+            cfg = cfg_by_key.get(normalize_key(model_name))
+            forms = self.db.get("forms_by_code", {}).get(product.get("product_code", ""), [])
+            if cfg:
+                cfg_forms = cfg.get("forms", {})
+                matched_forms = [
+                    form.get("install_form", "")
+                    for form in forms
+                    if normalize_form(form.get("install_form", "")) in cfg_forms
+                ]
+                visible_count = sum(
+                    len([
+                        item
+                        for item in cfg_forms.get(normalize_form(form.get("install_form", "")), [])
+                        if not should_skip_component(" ".join([item.get("component_zh", ""), item.get("part_name", ""), item.get("code", "")]))
+                    ])
+                    for form in forms
+                )
+                status = "已导入"
+                source = cfg.get("source_file", "")
+                forms_text = "、".join(matched_forms) if matched_forms else "无匹配安装形式"
+                components_text = str(visible_count)
+            else:
+                status = "未导入"
+                source = ""
+                forms_text = ""
+                components_text = "0"
+            tree.insert("", "end", values=(model_name, product.get("product_code", ""), status, source, forms_text, components_text))
+
+        scrollbar = ttk.Scrollbar(wrapper, orient=VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        tree.pack(side=LEFT, fill=BOTH, expand=True)
+        scrollbar.pack(side=RIGHT, fill="y")
+
+    def show_change_log(self):
+        self.db = load_database()
+        logs = self.db.get("change_log", [])
+        window = Toplevel(self.root)
+        window.title("配置导入修改记录")
+        window.geometry("980x460")
+        wrapper = ttk.Frame(window, padding=10)
+        wrapper.pack(fill=BOTH, expand=True)
+        ttk.Label(
+            wrapper,
+            text=f"配置导入修改记录：共 {len(logs)} 条。",
+            font=("Microsoft YaHei UI", 10, "bold"),
+        ).pack(anchor="w", pady=(0, 8))
+
+        columns = ("time", "operator", "content")
+        tree = ttk.Treeview(wrapper, columns=columns, show="headings", height=16)
+        tree.heading("time", text="时间")
+        tree.heading("operator", text="工号")
+        tree.heading("content", text="更改内容")
+        tree.column("time", width=170, anchor="w")
+        tree.column("operator", width=120, anchor="w")
+        tree.column("content", width=650, anchor="w")
+
+        for item in reversed(logs):
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    item.get("time", ""),
+                    item.get("operator_id", ""),
+                    item.get("content", ""),
+                ),
+            )
+
+        scrollbar = ttk.Scrollbar(wrapper, orient=VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        tree.pack(side=LEFT, fill=BOTH, expand=True)
+        scrollbar.pack(side=RIGHT, fill="y")
+
+    def term_value(self, key):
+        return self.term_widgets[key].get("1.0", "end").strip()
+
+    def save_current_user_settings(self):
+        save_user_settings(
+            {
+                "header_address": self.header_address.get(),
+                "quote_company": self.quote_company.get(),
+                "quote_person": self.quote_person.get(),
+                "quote_phone": self.quote_phone.get(),
+                "quote_email": self.quote_email.get(),
+            }
+        )
+
+    def build_quote(self):
+        return QuoteInput(
+            language=LANG_OPTIONS.get(self.language_label.get(), "zh"),
+            model_name=self.model_var.get(),
+            install_form=self.form_var.get(),
+            quote_date=self.date_var.get(),
+            trade_term=self.trade_term.get(),
+            trade_place=self.trade_place.get(),
+            price=self.price.get(),
+            currency=self.currency.get(),
+            header_address=self.header_address.get(),
+            quote_company=self.quote_company.get(),
+            quote_person=self.quote_person.get(),
+            quote_phone=self.quote_phone.get(),
+            quote_email=self.quote_email.get(),
+            payment=self.term_value("payment"),
+            delivery=self.term_value("delivery"),
+            validity=self.term_value("validity"),
+            transportation=self.term_value("transportation"),
+            warranty=self.term_value("warranty"),
+            others=self.term_value("others"),
+            selected_option_indexes=[idx for idx, var in enumerate(self.option_vars) if var.get()],
+            selected_option_quantities={
+                str(idx): clean_text(self.option_qty_vars[idx].get()) or "1"
+                for idx, var in enumerate(self.option_vars)
+                if var.get()
+            },
+        )
+
+    def on_generate(self):
+        if not self.model_var.get() or not self.form_var.get():
+            messagebox.showwarning("缺少数据", "请先导入数据并选择产品型号和安装形式。")
+            return
+        quote = self.build_quote()
+        self.save_current_user_settings()
+        safe_model = re.sub(r"[^0-9A-Za-z._()-]+", "_", quote.model_name)
+        output = OUTPUT_DIR / f"中联塔机报价单_{safe_model}_{quote.quote_date}.pdf"
+        try:
+            make_pdf(self.db, quote, output)
+            messagebox.showinfo("生成完成", f"已生成:\n{output}")
+            os.startfile(output)
+        except Exception as exc:
+            messagebox.showerror("生成失败", str(exc))
+
+    def on_generate_config_list(self, list_type):
+        if not self.model_var.get() or not self.form_var.get():
+            messagebox.showwarning("缺少数据", "请先选择产品型号和安装形式。")
+            return
+        title = "基本配置清单" if list_type == "basic" else "增减配清单"
+        safe_model = re.sub(r"[^0-9A-Za-z._()-]+", "_", self.model_var.get())
+        safe_form = re.sub(r"[^0-9A-Za-z._()-]+", "_", self.form_var.get())
+        output = OUTPUT_DIR / f"{title}_{safe_model}_{safe_form}_{date.today().isoformat()}.xlsx"
+        try:
+            output = make_config_list_excel(self.db, self.model_var.get(), self.form_var.get(), list_type, output)
+            self.db = load_database()
+            messagebox.showinfo("生成完成", f"已生成:\n{output}")
+            os.startfile(output)
+        except Exception as exc:
+            messagebox.showerror(
+                "生成失败",
+                f"机型：{self.model_var.get()}\n安装形式：{self.form_var.get()}\n清单类型：{title}\n错误：{exc}",
+            )
+
+    def on_close(self):
+        self.save_current_user_settings()
+        self.root.destroy()
+
+
+def main():
+    ensure_dirs()
+    root = Tk()
+    QuotationApp(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

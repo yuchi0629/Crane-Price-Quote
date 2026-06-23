@@ -1,0 +1,36 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments and local runtime state
+.venv/
+venv/
+env/
+.agents/
+tmp/
+
+# Build and packaged release artifacts
+build/
+dist/
+release/
+*.spec~
+
+# Generated output files
+output/
+*.log
+
+# Local user settings
+data/user_settings.json
+
+# Imported/raw working spreadsheets placed in the project root
+PrdTowerCraneCfg_dataOut_*.xlsx
+PriceInDecreasePrice_dateOut_*.xlsx
+
+# Reference/source files used during manual testing
+参考文件/
+
+# Temporary/manual scratch files
+新建 文本文档.txt
+~$*
+*.tmp

@@ -1,0 +1,21 @@
+[
+  {
+    "model": "T2850-120V",
+    "base_form": "内爬式",
+    "type_zh": "动臂式",
+    "type_en": "Luffing",
+    "internal_climbing_height": "32.5m",
+    "jib_length": "40m",
+    "max_load": "32t",
+    "tip_load": "19.6t",
+    "mast_section_dimension": "2.5*2.5*5.98m",
+    "status_zh": "内爬式",
+    "status_en": "Internal Climbing",
+    "price_terms": "FOB 上海港",
+    "currency": "CNY",
+    "unit_price": "4,850,000",
+    "overview_zh": "1套起升变频机构\n2套回转变频机构\n1套变幅变频机构\n1套平衡臂（含平衡配重）\n1套40m起重臂\n1套上下回转平台\n1套内爬装置（不含液压油）\n1套吊钩\n1个驾驶室（含空调）\n全套电气控制系统\n全套电缆、钢丝绳和标准附件\n全套标准技术文件和备件图册",
+    "overview_en": "01 set of hoisting mechanism with inverter\n02 sets of slewing mechanism with inverter\n01 set of luffing mechanism with inverter\n01 set of balance boom with ballast\n01 set of 40m jib\n01 set of slewing bracket\n01 set of internal climbing system, hydraulic oil excluded\n01 set of hook\n01 unit of cabin with air conditioner\nComplete electric control system\nComplete electric cable, wire rope and standard accessories\nComplete technical documents and parts catalog",
+    "transportation": "11*40'HQ + 480m3"
+  }
+]

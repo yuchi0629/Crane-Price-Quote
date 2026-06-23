@@ -1,0 +1,13 @@
+*.py text
+*.md text
+*.txt text
+*.bat text eol=crlf
+*.json text
+*.spec text
+
+*.xlsx binary
+*.xlsm binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary

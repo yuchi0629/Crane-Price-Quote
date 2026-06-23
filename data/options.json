@@ -1,0 +1,32 @@
+[
+  {
+    "model": "T2850-120V",
+    "base_form": "内爬式",
+    "action": "add",
+    "item_zh": "增加10m起重臂",
+    "item_en": "Add 10m jib",
+    "price_delta": "+ CNY 180,000",
+    "remark_zh": "含相应拉杆和销轴",
+    "remark_en": "Including related tie bars and pins"
+  },
+  {
+    "model": "T2850-120V",
+    "base_form": "内爬式",
+    "action": "add",
+    "item_zh": "远程监控系统",
+    "item_en": "Remote monitoring system",
+    "price_delta": "+ CNY 65,000",
+    "remark_zh": "含一年平台服务",
+    "remark_en": "Including one-year platform service"
+  },
+  {
+    "model": "T2850-120V",
+    "base_form": "内爬式",
+    "action": "deduct",
+    "item_zh": "取消驾驶室空调",
+    "item_en": "Remove cabin air conditioner",
+    "price_delta": "- CNY 8,000",
+    "remark_zh": "",
+    "remark_en": ""
+  }
+]
