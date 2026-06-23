@@ -1383,10 +1383,13 @@ def make_ltc_option_pdf(quote, output_path):
         Paragraph("LTC选配指导文件", title_style),
         Paragraph(f"产品型号：{quote.model_name}　安装形式：{quote.install_form}　日期：{quote.quote_date}", normal),
     ]
+
+    def ltc_text(value):
+        return clean_text(value).replace("图", "")
+
     rows = [[
         make_paragraph("No.", center),
         make_paragraph("增减配", center),
-        make_paragraph("组成", center),
         make_paragraph("部件", center),
         make_paragraph("名称", center),
         make_paragraph("编码", center),
@@ -1406,21 +1409,16 @@ def make_ltc_option_pdf(quote, output_path):
         else:
             expanded_items.append(item)
     for idx, item in enumerate(expanded_items, start=1):
-        composition = item.get("composition", "")
-        package_name = item.get("package_name", "")
-        if package_name and package_name not in composition:
-            composition = f"{composition}（{package_name}）" if composition else package_name
         rows.append([
             clean_text(idx),
-            make_paragraph(item.get("change_type", "增配"), center),
-            make_paragraph(composition, left),
-            make_paragraph(item.get("component", ""), left),
-            make_paragraph(item.get("name", ""), left),
-            make_paragraph(item.get("code", ""), left),
-            make_paragraph(item.get("model_code", ""), left),
+            make_paragraph(ltc_text(item.get("change_type", "增配")), center),
+            make_paragraph(ltc_text(item.get("component", "")), left),
+            make_paragraph(ltc_text(item.get("name", "")), left),
+            make_paragraph(ltc_text(item.get("code", "")), left),
+            make_paragraph(ltc_text(item.get("model_code", "")), left),
             make_paragraph(clean_text(item.get("quantity", "")) or "1", center),
         ])
-    table = Table(rows, colWidths=[8 * mm, 15 * mm, 26 * mm, 26 * mm, 36 * mm, 31 * mm, 27 * mm, 13 * mm], repeatRows=1)
+    table = Table(rows, colWidths=[8 * mm, 16 * mm, 31 * mm, 40 * mm, 34 * mm, 31 * mm, 13 * mm], repeatRows=1)
     table.setStyle(table_style())
     story.append(table)
     doc.build(story)
@@ -1500,7 +1498,7 @@ class QuotationApp:
         settings_row.pack(fill="x")
         product_select = ttk.LabelFrame(settings_row, text="产品型号选择", padding=10, style="Title.TLabelframe")
         product_select.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
-        info_box = ttk.LabelFrame(settings_row, text="产品基本信息", padding=10, style="Title.TLabelframe")
+        info_box = ttk.LabelFrame(settings_row, text="产品基本信息", padding=6, style="Title.TLabelframe")
         info_box.pack(side=LEFT, fill="both", expand=True)
 
         self.model_combo = ttk.Combobox(product_select, textvariable=self.model_display_var, width=28, state="readonly")
@@ -1525,11 +1523,11 @@ class QuotationApp:
         for idx, (key, label_text) in enumerate(info_items):
             row = idx // 2
             col = (idx % 2) * 2
-            ttk.Label(info_box, text=f"{label_text}:").grid(row=row, column=col, sticky="w", padx=(0, 4), pady=2)
-            value_label = ttk.Label(info_box, text="", width=22)
-            value_label.grid(row=row, column=col + 1, sticky="w", padx=(0, 16), pady=2)
+            ttk.Label(info_box, text=f"{label_text}:").grid(row=row, column=col, sticky="w", padx=(0, 3), pady=1)
+            value_label = ttk.Label(info_box, text="", width=18)
+            value_label.grid(row=row, column=col + 1, sticky="w", padx=(0, 8), pady=1)
             self.info_value_labels[key] = value_label
-        self.info_message_label.grid(row=4, column=0, columnspan=4, sticky="w", pady=(6, 0))
+        self.info_message_label.grid(row=4, column=0, columnspan=4, sticky="w", pady=(3, 0))
         info_box.columnconfigure(1, weight=1)
         info_box.columnconfigure(3, weight=1)
         self.model_combo.bind("<<ComboboxSelected>>", lambda _e: self.on_model_selected())
@@ -1684,12 +1682,11 @@ class QuotationApp:
         return self.db.get("options_by_code", {}).get(product_code, [])
 
     def model_display_name(self, model):
-        status = "√" if has_imported_config(self.db, model) else "×"
-        return f"{status} {model}"
+        return model
 
     def on_model_selected(self):
         display = self.model_display_var.get()
-        model = self.model_display_to_name.get(display, display[2:] if len(display) > 2 and display[1] == " " else display)
+        model = self.model_display_to_name.get(display, display)
         self.model_var.set(model)
         self.refresh_forms()
 
