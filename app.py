@@ -1551,6 +1551,7 @@ class QuotationApp:
     def build_ui(self):
         style = ttk.Style(self.root)
         style.configure("Title.TLabelframe.Label", font=("Microsoft YaHei UI", 11, "bold"))
+        style.configure("DialogTitle.TLabel", font=("Microsoft YaHei UI", 12, "bold"))
         main = ttk.Frame(self.root, padding=12)
         main.pack(fill=BOTH, expand=True)
         ttk.Label(main, text="中联塔机报价单生成软件", font=("Microsoft YaHei UI", 18, "bold")).pack(anchor="w")
@@ -1846,7 +1847,75 @@ class QuotationApp:
             ttk.Checkbutton(row, variable=var).pack(side=LEFT)
             ttk.Spinbox(row, from_=1, to=999, textvariable=qty_var, width=6).pack(side=LEFT, padx=(0, 8))
             ttk.Combobox(row, textvariable=type_var, values=["增配", "减配"], width=8, state="readonly").pack(side=LEFT, padx=(0, 8))
-            ttk.Label(row, text=option.get("item_display", ""), wraplength=520).pack(side=LEFT, anchor="w")
+            if option.get("children"):
+                ttk.Button(
+                    row,
+                    text="查看包内容",
+                    command=lambda item=option: self.show_option_package_contents(item),
+                ).pack(side=RIGHT, padx=(8, 0))
+            ttk.Label(row, text=option.get("item_display", ""), wraplength=430).pack(side=LEFT, fill="x", expand=True, anchor="w")
+
+    def show_option_package_contents(self, option):
+        children = option.get("children") or []
+        dialog = Toplevel(self.root)
+        dialog.title(f"{option.get('item_display', '包')} - 包内容")
+        dialog.geometry("900x480")
+        dialog.minsize(720, 360)
+        dialog.transient(self.root)
+        try:
+            if WINDOW_ICON_FILE.exists():
+                dialog.iconbitmap(default=str(WINDOW_ICON_FILE))
+        except Exception:
+            pass
+
+        wrapper = ttk.Frame(dialog, padding=12)
+        wrapper.pack(fill=BOTH, expand=True)
+        ttk.Label(
+            wrapper,
+            text=f"{option.get('item_display', '包')}（共 {len(children)} 项）",
+            style="DialogTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 10))
+
+        table_frame = ttk.Frame(wrapper)
+        table_frame.pack(fill=BOTH, expand=True)
+        columns = ("seq", "component", "name", "code", "model_code", "mark")
+        tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
+        headings = {
+            "seq": "序号",
+            "component": "部件",
+            "name": "名称",
+            "code": "编码",
+            "model_code": "代号",
+            "mark": "配置标记",
+        }
+        widths = {"seq": 55, "component": 130, "name": 180, "code": 190, "model_code": 170, "mark": 80}
+        for column in columns:
+            tree.heading(column, text=headings[column])
+            tree.column(column, width=widths[column], anchor="w")
+        for index, child in enumerate(children, start=1):
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    index,
+                    child.get("component", ""),
+                    child.get("name", ""),
+                    child.get("code", ""),
+                    code_or_slash(child.get("model_code", "")),
+                    child.get("mark", ""),
+                ),
+            )
+
+        vertical_scroll = ttk.Scrollbar(table_frame, orient=VERTICAL, command=tree.yview)
+        horizontal_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=vertical_scroll.set, xscrollcommand=horizontal_scroll.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        vertical_scroll.grid(row=0, column=1, sticky="ns")
+        horizontal_scroll.grid(row=1, column=0, sticky="ew")
+        table_frame.rowconfigure(0, weight=1)
+        table_frame.columnconfigure(0, weight=1)
+
+        ttk.Button(wrapper, text="关闭", command=dialog.destroy).pack(anchor="e", pady=(10, 0))
 
     def refresh_basic_config(self):
         for item_id in self.basic_config_tree.get_children():
