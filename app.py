@@ -301,6 +301,14 @@ def code_or_slash(value):
     return clean_text(value) or "/"
 
 
+def join_display_parts(parts):
+    return "、".join(clean_text(part) for part in parts if clean_text(part))
+
+
+def compact_display_text(value):
+    return re.sub(r"\s+", "", clean_text(value))
+
+
 def normalize_key(value):
     return re.sub(r"\s+", "", clean_text(value)).replace("（", "(").replace("）", ")").upper()
 
@@ -508,7 +516,7 @@ def quantity_from_mark(mark):
 
 
 EXPORT_OPTION_KEYWORDS = ["标准节", "基节", "基础节", "底架", "支腿座", "基础预埋", "支腿组件"]
-EXPORT_DROP_KEYWORDS = ["序号", "编码", "备注", "重量", "更改"]
+EXPORT_DROP_KEYWORDS = ["序号", "编码", "备注", "重量", "更改", "价格", "基价"]
 EXPORT_SCHEMA_VERSION = 3
 
 
@@ -599,7 +607,27 @@ def workbook_bytes_for_model(db, model_name):
     return None
 
 
-def config_rows_for_form(db, model_name, install_form):
+def worksheet_for_list_type(wb, list_type):
+    if list_type == "option" and len(wb.worksheets) > 1:
+        for ws in wb.worksheets[1:]:
+            if "增减" in clean_text(ws.title) or "选配" in clean_text(ws.title):
+                return ws
+        return wb.worksheets[1]
+    return wb.worksheets[0]
+
+
+def matched_form_column(form_columns, install_form):
+    form_key = normalize_form(install_form)
+    form_col = form_columns.get(form_key)
+    if form_col:
+        return form_col
+    for saved_form, col in form_columns.items():
+        if saved_form in form_key or form_key in saved_form:
+            return col
+    return None
+
+
+def config_rows_for_form(db, model_name, install_form, list_type="basic"):
     workbook_bytes = workbook_bytes_for_model(db, model_name)
     if not workbook_bytes:
         db, _cfg = ensure_export_config(db, model_name)
@@ -608,15 +636,9 @@ def config_rows_for_form(db, model_name, install_form):
         raise ValueError("当前机型没有可读取的配置表原始数据。")
 
     wb = load_workbook(BytesIO(workbook_bytes), data_only=True)
-    ws = wb.active
+    ws = worksheet_for_list_type(wb, list_type)
     form_row, form_columns = find_config_form_columns(ws)
-    form_key = normalize_form(install_form)
-    form_col = form_columns.get(form_key)
-    if not form_col:
-        for saved_form, col in form_columns.items():
-            if saved_form in form_key or form_key in saved_form:
-                form_col = col
-                break
+    form_col = matched_form_column(form_columns, install_form)
     if not form_col:
         raise ValueError("当前安装形式没有匹配到配置表列。")
 
@@ -625,20 +647,24 @@ def config_rows_for_form(db, model_name, install_form):
     name_col = find_header_column(ws, form_row, ["名称"])
     code_col = find_header_column(ws, form_row, ["编码"])
     model_code_col = find_header_column(ws, form_row, ["代号"])
+    price_col = find_header_column(ws, form_row, ["价格", "基价"])
     rows = []
     for row_idx in range(form_row + 1, ws.max_row + 1):
         full_row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
         if not full_row_text:
             continue
         mark = clean_text(ws.cell(row_idx, form_col).value)
+        composition_value = clean_config_text(cell_value_with_merge(ws, row_idx, comp_col)) if comp_col else ""
+        component_value = clean_config_text(cell_value_with_merge(ws, row_idx, part_col)) if part_col else composition_value
         rows.append(
             {
-                "composition": clean_config_text(cell_value_with_merge(ws, row_idx, comp_col)) if comp_col else "",
-                "component": clean_config_text(cell_value_with_merge(ws, row_idx, part_col)) if part_col else "",
+                "composition": composition_value,
+                "component": component_value,
                 "name": clean_config_text(cell_value_with_merge(ws, row_idx, name_col)) if name_col else "",
                 "code": clean_config_text(cell_value_with_merge(ws, row_idx, code_col)) if code_col else "",
                 "model_code": clean_config_text(cell_value_with_merge(ws, row_idx, model_code_col)) if model_code_col else "",
                 "mark": clean_config_text(mark),
+                "price": format_number(cell_value_with_merge(ws, row_idx, price_col)) if price_col else "",
                 "row_text": clean_config_text(full_row_text),
             }
         )
@@ -650,10 +676,9 @@ def basic_config_items(db, model_name, install_form):
 
 
 def option_config_items(db, model_name, install_form):
-    rows = config_rows_for_form(db, model_name, install_form)
+    rows = config_rows_for_form(db, model_name, install_form, list_type="option")
     items = []
-    climbing_items = []
-    collector_items = []
+    package_groups = {}
     for row in rows:
         text = " ".join(
             [
@@ -667,24 +692,33 @@ def option_config_items(db, model_name, install_form):
         )
         if "电源箱总成" in text:
             continue
-        if "爬升" in text:
-            child = dict(row)
-            child["item_display"] = "、".join([child.get("component", ""), child.get("name", ""), code_or_slash(child.get("model_code", ""))])
-            climbing_items.append(child)
-            continue
-        if "中央集电环" in text:
-            child = dict(row)
-            child["item_display"] = "、".join([child.get("component", ""), child.get("name", ""), code_or_slash(child.get("model_code", ""))])
-            collector_items.append(child)
-            continue
         if "○" in row.get("mark", "") or any(keyword in row.get("row_text", "") for keyword in EXPORT_OPTION_KEYWORDS):
             item = dict(row)
-            item["item_display"] = "、".join([item.get("component", ""), item.get("name", ""), code_or_slash(item.get("model_code", ""))])
-            items.append(item)
-    if climbing_items:
-        items.append({"composition": "爬升", "component": "爬升包", "name": "爬升包", "code": "", "model_code": "", "mark": "○", "item_display": "爬升包", "children": climbing_items})
-    if collector_items:
-        items.append({"composition": "中央集电环", "component": "中央集电环包", "name": "中央集电环包", "code": "", "model_code": "", "mark": "○", "item_display": "中央集电环包", "children": collector_items})
+            composition = clean_config_text(item.get("composition", ""))
+            if compact_display_text(composition) == "选配":
+                item["item_display"] = join_display_parts([item.get("name", ""), code_or_slash(item.get("model_code", ""))])
+            else:
+                item["item_display"] = join_display_parts([item.get("component", ""), item.get("name", ""), code_or_slash(item.get("model_code", ""))])
+            if composition and compact_display_text(composition) != "选配":
+                package_groups.setdefault(composition, []).append(item)
+            else:
+                items.append(item)
+    for composition, children in package_groups.items():
+        price = next((clean_text(child.get("price", "")) for child in children if clean_text(child.get("price", ""))), "")
+        display_composition = compact_display_text(composition)
+        items.append(
+            {
+                "composition": composition,
+                "component": display_composition,
+                "name": display_composition,
+                "code": "",
+                "model_code": "",
+                "mark": "○",
+                "price": price,
+                "item_display": display_composition,
+                "children": children,
+            }
+        )
     return items
 
 
@@ -756,17 +790,20 @@ def import_tower_config_file(path, model_name=None):
     form_row, form_columns = find_config_form_columns(ws)
     components_by_form = {form: [] for form in form_columns}
     export_forms = build_config_export_rows(ws, form_row, form_columns)
+    name_col = find_header_column(ws, form_row, ["名称"])
+    model_code_col = find_header_column(ws, form_row, ["代号"])
 
     for row_idx in range(form_row + 1, ws.max_row + 1):
-        source_values = [ws.cell(row_idx, col).value for col in range(2, 7)]
+        source_values = [ws.cell(row_idx, col).value for col in range(1, ws.max_column + 1)]
         row_text = " ".join(clean_text(value) for value in source_values)
         if should_skip_component(row_text):
             continue
         component = classify_component(row_text)
         if not component:
             continue
-        part_name = clean_text(ws.cell(row_idx, 4).value) or clean_text(ws.cell(row_idx, 3).value) or component["zh"]
-        code = clean_text(ws.cell(row_idx, 6).value) or clean_text(ws.cell(row_idx, 5).value)
+        part_name = clean_text(ws.cell(row_idx, name_col).value) if name_col else ""
+        code = clean_text(ws.cell(row_idx, model_code_col).value) if model_code_col else ""
+        part_name = part_name or component["zh"]
         for form_key, col in form_columns.items():
             mark = clean_text(ws.cell(row_idx, col).value)
             if "●" not in mark:
@@ -1180,7 +1217,7 @@ def safe_filename_stem(name):
     return re.sub(r'[<>:"/\\|?*]+', "_", clean_text(name)).strip(" .") or "配置及增减配清单"
 
 
-def export_all_form_column_indexes(ws, form_row, form_columns):
+def export_all_form_column_indexes(ws, form_row, form_columns, drop_price_only=False):
     columns = []
     component_col = None
     name_col = None
@@ -1193,9 +1230,10 @@ def export_all_form_column_indexes(ws, form_row, form_columns):
     for col in range(1, ws.max_column + 1):
         header_text = column_header_text(ws, col, form_row)
         normalized_header = re.sub(r"\s+", "", header_text)
-        if component_col and name_col and col == component_col:
+        if not drop_price_only and component_col and name_col and col == component_col:
             continue
-        if any(keyword in normalized_header for keyword in EXPORT_DROP_KEYWORDS if keyword != "序号"):
+        drop_keywords = ["价格", "基价"] if drop_price_only else [keyword for keyword in EXPORT_DROP_KEYWORDS if keyword != "序号"]
+        if any(keyword in normalized_header for keyword in drop_keywords):
             continue
         has_data = any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(1, ws.max_row + 1))
         if header_text or has_data or col in form_columns.values():
@@ -1252,7 +1290,7 @@ def selected_config_source_rows(ws, form_row, form_columns, list_type):
     return source_rows
 
 
-def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_row, form_columns, list_type, model_name):
+def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_row, form_columns, list_type, model_name, normalize_headers=True, renumber=True):
     row_map = {source_row: target_row for target_row, source_row in enumerate(source_rows, start=1)}
     col_map = {source_col: target_col for target_col, source_col in enumerate(source_columns, start=1)}
     sequence_col = None
@@ -1268,15 +1306,15 @@ def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_ro
         for target_col, source_col in enumerate(source_columns, start=1):
             source_cell = source_ws.cell(source_row, source_col)
             value = source_cell.value
-            if source_row == 1 and source_col == source_columns[0]:
+            if normalize_headers and source_row == 1 and source_col == source_columns[0]:
                 value = config_list_title(value, model_name, list_type)
-            elif source_row <= form_row:
+            elif normalize_headers and source_row <= form_row:
                 normalized_value = re.sub(r"\s+", "", clean_text(value))
                 if normalized_value == "组成":
                     value = "产品模块"
                 elif normalized_value == "名称":
                     value = "部件名称"
-            elif source_row > form_row and source_col == sequence_col:
+            elif renumber and source_row > form_row and source_col == sequence_col:
                 value = body_index
             elif list_type == "option" and source_row > form_row and source_col in form_columns.values():
                 row_text = " ".join(clean_text(source_ws.cell(source_row, col).value) for col in range(1, source_ws.max_column + 1))
@@ -1327,13 +1365,19 @@ def make_combined_config_option_excel(db, model_name, output_path):
         raise ValueError("当前机型没有已导入的配置表原始数据，无法生成配置及增减配清单。")
 
     source_wb = load_workbook(BytesIO(workbook_bytes))
-    source_ws = source_wb.active
-    form_row, form_columns = find_config_form_columns(source_ws)
-    if not form_columns:
+    basic_source_ws = worksheet_for_list_type(source_wb, "basic")
+    option_source_ws = worksheet_for_list_type(source_wb, "option")
+    basic_form_row, basic_form_columns = find_config_form_columns(basic_source_ws)
+    option_form_row, option_form_columns = find_config_form_columns(option_source_ws)
+    if not basic_form_columns:
         raise ValueError("配置表中未识别到安装形式列，无法生成清单。")
+    if not option_form_columns:
+        option_source_ws = basic_source_ws
+        option_form_row, option_form_columns = basic_form_row, basic_form_columns
 
-    source_columns = export_all_form_column_indexes(source_ws, form_row, form_columns)
-    if not source_columns:
+    basic_columns = export_all_form_column_indexes(basic_source_ws, basic_form_row, basic_form_columns, drop_price_only=True)
+    option_columns = export_all_form_column_indexes(option_source_ws, option_form_row, option_form_columns, drop_price_only=True)
+    if not basic_columns or not option_columns:
         raise ValueError("配置表中没有可导出的列。")
 
     output_wb = Workbook()
@@ -1341,15 +1385,37 @@ def make_combined_config_option_excel(db, model_name, output_path):
     basic_ws.title = safe_sheet_title(f"{model_name}配置清单")
     option_ws = output_wb.create_sheet(safe_sheet_title(f"{model_name}增减配清单"))
 
-    basic_rows = selected_config_source_rows(source_ws, form_row, form_columns, "basic")
-    option_rows = selected_config_source_rows(source_ws, form_row, form_columns, "option")
-    if len(basic_rows) <= form_row:
+    basic_rows = selected_config_source_rows(basic_source_ws, basic_form_row, basic_form_columns, "basic")
+    option_rows = selected_config_source_rows(option_source_ws, option_form_row, option_form_columns, "option")
+    if len(basic_rows) <= basic_form_row:
         raise ValueError("配置表中没有识别到基础配置实心圈项目。")
-    if len(option_rows) <= form_row:
+    if len(option_rows) <= option_form_row:
         raise ValueError("配置表中没有识别到增减配项目。")
 
-    copy_config_sheet(source_ws, basic_ws, basic_rows, source_columns, form_row, form_columns, "basic", model_name)
-    copy_config_sheet(source_ws, option_ws, option_rows, source_columns, form_row, form_columns, "option", model_name)
+    copy_config_sheet(
+        basic_source_ws,
+        basic_ws,
+        basic_rows,
+        basic_columns,
+        basic_form_row,
+        basic_form_columns,
+        "basic",
+        model_name,
+        normalize_headers=False,
+        renumber=False,
+    )
+    copy_config_sheet(
+        option_source_ws,
+        option_ws,
+        option_rows,
+        option_columns,
+        option_form_row,
+        option_form_columns,
+        "option",
+        model_name,
+        normalize_headers=False,
+        renumber=False,
+    )
 
     return save_workbook_without_overwrite_conflict(output_wb, output_path)
 
@@ -1796,7 +1862,7 @@ class QuotationApp:
         basic_config_box.pack(fill=BOTH, expand=True)
         self.basic_config_tree = ttk.Treeview(
             basic_config_box,
-            columns=("seq", "component", "name", "model_code", "mark"),
+            columns=("seq", "component", "name", "model_code", "mark", "price"),
             show="headings",
             height=12,
         )
@@ -1806,8 +1872,9 @@ class QuotationApp:
             "name": "名称",
             "model_code": "代号",
             "mark": "数量",
+            "price": "价格",
         }
-        basic_widths = {"seq": 50, "component": 110, "name": 150, "model_code": 170, "mark": 80}
+        basic_widths = {"seq": 50, "component": 90, "name": 140, "model_code": 150, "mark": 70, "price": 90}
         for col in basic_headings:
             self.basic_config_tree.heading(col, text=basic_headings[col])
             self.basic_config_tree.column(col, width=basic_widths[col], anchor="w")
@@ -2019,6 +2086,7 @@ class QuotationApp:
         ttk.Label(header, text="选择", width=6).pack(side=LEFT)
         ttk.Label(header, text="数量", width=8).pack(side=LEFT, padx=(0, 6))
         ttk.Label(header, text="增减配", width=10).pack(side=LEFT, padx=(0, 6))
+        ttk.Label(header, text="价格", width=12).pack(side=LEFT, padx=(0, 6))
         ttk.Label(header, text="项目").pack(side=LEFT)
         for option in options:
             row = ttk.Frame(self.option_frame.inner)
@@ -2032,13 +2100,14 @@ class QuotationApp:
             ttk.Checkbutton(row, variable=var).pack(side=LEFT)
             ttk.Spinbox(row, from_=1, to=999, textvariable=qty_var, width=6).pack(side=LEFT, padx=(0, 8))
             ttk.Combobox(row, textvariable=type_var, values=["增配", "减配"], width=8, state="readonly").pack(side=LEFT, padx=(0, 8))
+            ttk.Label(row, text=option.get("price", ""), width=12).pack(side=LEFT, padx=(0, 8))
             if option.get("children"):
                 ttk.Button(
                     row,
                     text="查看包内容",
                     command=lambda item=option: self.show_option_package_contents(item),
                 ).pack(side=RIGHT, padx=(8, 0))
-            ttk.Label(row, text=option.get("item_display", ""), wraplength=430).pack(side=LEFT, fill="x", expand=True, anchor="w")
+            ttk.Label(row, text=option.get("item_display", ""), wraplength=360).pack(side=LEFT, fill="x", expand=True, anchor="w")
 
     def show_option_package_contents(self, option):
         children = option.get("children") or []
@@ -2063,7 +2132,7 @@ class QuotationApp:
 
         table_frame = ttk.Frame(wrapper)
         table_frame.pack(fill=BOTH, expand=True)
-        columns = ("seq", "component", "name", "code", "model_code", "mark")
+        columns = ("seq", "component", "name", "code", "model_code", "mark", "price")
         tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
         headings = {
             "seq": "序号",
@@ -2072,8 +2141,9 @@ class QuotationApp:
             "code": "编码",
             "model_code": "代号",
             "mark": "配置标记",
+            "price": "价格",
         }
-        widths = {"seq": 55, "component": 130, "name": 180, "code": 190, "model_code": 170, "mark": 80}
+        widths = {"seq": 55, "component": 110, "name": 170, "code": 170, "model_code": 150, "mark": 75, "price": 90}
         for column in columns:
             tree.heading(column, text=headings[column])
             tree.column(column, width=widths[column], anchor="w")
@@ -2088,6 +2158,7 @@ class QuotationApp:
                     child.get("code", ""),
                     code_or_slash(child.get("model_code", "")),
                     child.get("mark", ""),
+                    child.get("price", ""),
                 ),
             )
 
@@ -2121,6 +2192,7 @@ class QuotationApp:
                     item.get("name", ""),
                     code_or_slash(item.get("model_code", "")),
                     item.get("mark", ""),
+                    item.get("price", ""),
                 ),
             )
 
