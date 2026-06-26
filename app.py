@@ -36,6 +36,7 @@ DB_FILE = DATA_DIR / "quotation_database.json"
 SETTINGS_FILE = DATA_DIR / "user_settings.json"
 INITIAL_DB_FILE = BUNDLE_DIR / "data" / "quotation_database.json"
 WINDOW_ICON_FILE = BUNDLE_DIR / "assets" / "zoomlion.ico"
+CONFIG_DATA_RESET_VERSION = 1
 EMBEDDED_LOGO_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAGwAAAAfCAYAAAAC0CiiAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8"
     "YQUAAAAJcEhZcwAADsQAAA7EAZUrDhsAAANKSURBVGhD7ZoxSBtRGMf/7WQLBUsKUWgiImZwEMngECxdQ"
@@ -218,7 +219,19 @@ def default_database():
         "deleted_config_model_keys": [],
         "options_by_code": {},
         "change_log": [],
+        "config_data_reset_version": CONFIG_DATA_RESET_VERSION,
     }
+
+
+def apply_database_migrations(db, reset_config_data=False):
+    changed = False
+    if reset_config_data:
+        db["components_by_model"] = {}
+        db["config_exports_by_model"] = {}
+        db["deleted_config_model_keys"] = []
+        db["config_data_reset_version"] = CONFIG_DATA_RESET_VERSION
+        changed = True
+    return changed
 
 
 def load_database():
@@ -228,8 +241,13 @@ def load_database():
         return default_database()
     with source.open("r", encoding="utf-8") as f:
         db = json.load(f)
+    reset_config_data = int(db.get("config_data_reset_version", 0) or 0) < CONFIG_DATA_RESET_VERSION
     base = default_database()
     base.update(db)
+    changed = apply_database_migrations(base, reset_config_data)
+    if changed and source == DB_FILE:
+        with DB_FILE.open("w", encoding="utf-8") as f:
+            json.dump(base, f, ensure_ascii=False, indent=2)
     return base
 
 
@@ -331,6 +349,24 @@ def format_number(value):
     if number.is_integer():
         return f"{int(number):,}"
     return f"{number:,.2f}".rstrip("0").rstrip(".")
+
+
+def parse_price_value(value):
+    text = clean_text(value).replace(",", "")
+    if not text:
+        return 0.0
+    match = re.search(r"-?\d+(?:\.\d+)?", text)
+    if not match:
+        return 0.0
+    try:
+        return float(match.group())
+    except ValueError:
+        return 0.0
+
+
+def format_price_value(value):
+    sign = "-" if value < 0 else ""
+    return sign + format_number(abs(value))
 
 
 def parse_config_description(description):
@@ -1780,6 +1816,9 @@ class QuotationApp:
         self.option_qty_vars = []
         self.option_type_vars = []
         self.config_option_items = []
+        self.machine_price_var = StringVar(value="")
+        self.option_price_var = StringVar(value="")
+        self.total_price_var = StringVar(value="")
         self.term_defaults = {
             "payment": "合同签订后支付30%作为定金，发货前付清剩余70%合同款。",
             "delivery": "收到定金后90日内发货。",
@@ -1823,7 +1862,9 @@ class QuotationApp:
         product_select = ttk.LabelFrame(settings_row, text="产品型号选择", padding=10, style="Title.TLabelframe")
         product_select.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
         info_box = ttk.LabelFrame(settings_row, text="产品基本信息", padding=6, style="Title.TLabelframe")
-        info_box.pack(side=LEFT, fill="both", expand=True)
+        info_box.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
+        price_box = ttk.LabelFrame(settings_row, text="当前价格", padding=8, style="Title.TLabelframe")
+        price_box.pack(side=LEFT, fill="both")
 
         self.model_combo = ttk.Combobox(product_select, textvariable=self.model_display_var, width=28, state="readonly")
         self.form_combo = ttk.Combobox(product_select, textvariable=self.form_var, width=24, state="readonly")
@@ -1854,6 +1895,14 @@ class QuotationApp:
         self.info_message_label.grid(row=4, column=0, columnspan=4, sticky="w", pady=(3, 0))
         info_box.columnconfigure(1, weight=1)
         info_box.columnconfigure(3, weight=1)
+        price_items = [
+            ("整机价格", self.machine_price_var),
+            ("选配价格", self.option_price_var),
+            ("当前合计", self.total_price_var),
+        ]
+        for idx, (label_text, value_var) in enumerate(price_items):
+            ttk.Label(price_box, text=f"{label_text}:").grid(row=idx, column=0, sticky="w", padx=(0, 6), pady=3)
+            ttk.Label(price_box, textvariable=value_var, width=16).grid(row=idx, column=1, sticky="w", pady=3)
         self.model_combo.bind("<<ComboboxSelected>>", lambda _e: self.on_model_selected())
         self.form_combo.bind("<<ComboboxSelected>>", lambda _e: self.refresh_screen())
 
@@ -1868,7 +1917,7 @@ class QuotationApp:
         basic_config_box.pack(fill=BOTH, expand=True)
         self.basic_config_tree = ttk.Treeview(
             basic_config_box,
-            columns=("seq", "component", "name", "model_code", "mark", "price"),
+            columns=("seq", "component", "name", "model_code", "mark"),
             show="headings",
             height=12,
         )
@@ -1878,9 +1927,8 @@ class QuotationApp:
             "name": "名称",
             "model_code": "代号",
             "mark": "数量",
-            "price": "价格",
         }
-        basic_widths = {"seq": 50, "component": 90, "name": 140, "model_code": 150, "mark": 70, "price": 90}
+        basic_widths = {"seq": 50, "component": 100, "name": 160, "model_code": 170, "mark": 80}
         for col in basic_headings:
             self.basic_config_tree.heading(col, text=basic_headings[col])
             self.basic_config_tree.column(col, width=basic_widths[col], anchor="w")
@@ -2076,15 +2124,18 @@ class QuotationApp:
         self.config_option_items = []
         if not self.model_var.get() or not self.form_var.get():
             ttk.Label(self.option_frame.inner, text="请先选择产品型号和安装形式。").pack(anchor="w")
+            self.update_current_price()
             return
         try:
             options = option_config_items(self.db, self.model_var.get(), self.form_var.get())
         except Exception as exc:
             ttk.Label(self.option_frame.inner, text=f"无法读取配置表增减配数据：{exc}").pack(anchor="w")
+            self.update_current_price()
             return
         self.config_option_items = options
         if not options:
             ttk.Label(self.option_frame.inner, text="当前安装形式暂无可选增减配置。").pack(anchor="w")
+            self.update_current_price()
             return
 
         header = ttk.Frame(self.option_frame.inner)
@@ -2100,6 +2151,9 @@ class QuotationApp:
             var = BooleanVar(value=False)
             qty_var = StringVar(value="1")
             type_var = StringVar(value="增配")
+            var.trace_add("write", lambda *_args: self.update_current_price())
+            qty_var.trace_add("write", lambda *_args: self.update_current_price())
+            type_var.trace_add("write", lambda *_args: self.update_current_price())
             self.option_vars.append(var)
             self.option_qty_vars.append(qty_var)
             self.option_type_vars.append(type_var)
@@ -2114,6 +2168,7 @@ class QuotationApp:
                     command=lambda item=option: self.show_option_package_contents(item),
                 ).pack(side=RIGHT, padx=(8, 0))
             ttk.Label(row, text=option.get("item_display", ""), wraplength=360).pack(side=LEFT, fill="x", expand=True, anchor="w")
+        self.update_current_price()
 
     def show_option_package_contents(self, option):
         children = option.get("children") or []
@@ -2179,6 +2234,40 @@ class QuotationApp:
 
         ttk.Button(wrapper, text="关闭", command=dialog.destroy).pack(anchor="e", pady=(10, 0))
 
+    def machine_price_value(self):
+        if not self.model_var.get() or not self.form_var.get():
+            return 0.0
+        try:
+            items = basic_config_items(self.db, self.model_var.get(), self.form_var.get())
+        except Exception:
+            return 0.0
+        for item in items:
+            price = parse_price_value(item.get("price", ""))
+            if price:
+                return price
+        return 0.0
+
+    def selected_option_price_value(self):
+        total = 0.0
+        for idx, var in enumerate(self.option_vars):
+            if not var.get() or idx >= len(self.config_option_items):
+                continue
+            item = self.config_option_items[idx]
+            qty = parse_price_value(self.option_qty_vars[idx].get() if idx < len(self.option_qty_vars) else "1") or 1
+            price = parse_price_value(item.get("price", ""))
+            change_type = clean_text(self.option_type_vars[idx].get()) if idx < len(self.option_type_vars) else "增配"
+            sign = -1 if "减" in change_type else 1
+            total += sign * price * qty
+        return total
+
+    def update_current_price(self):
+        machine_price = self.machine_price_value()
+        option_price = self.selected_option_price_value()
+        total_price = machine_price + option_price
+        self.machine_price_var.set(format_price_value(machine_price) if machine_price else "")
+        self.option_price_var.set(format_price_value(option_price) if option_price else "")
+        self.total_price_var.set(format_price_value(total_price) if total_price else "")
+
     def refresh_basic_config(self):
         for item_id in self.basic_config_tree.get_children():
             self.basic_config_tree.delete(item_id)
@@ -2198,9 +2287,9 @@ class QuotationApp:
                     item.get("name", ""),
                     code_or_slash(item.get("model_code", "")),
                     item.get("mark", ""),
-                    item.get("price", ""),
                 ),
             )
+        self.update_current_price()
 
     def reload_db(self):
         self.db = load_database()
