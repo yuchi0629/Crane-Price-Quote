@@ -12,6 +12,7 @@ from tkinter import ttk
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
+from copy import copy
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -1170,6 +1171,177 @@ def make_basic_list_from_component_summary(db, model_name, install_form, output_
     return save_workbook_without_overwrite_conflict(wb, output_path)
 
 
+def safe_sheet_title(title):
+    text = re.sub(r"[:\\/?*\[\]]", "_", clean_text(title)) or "Sheet"
+    return text[:31]
+
+
+def safe_filename_stem(name):
+    return re.sub(r'[<>:"/\\|?*]+', "_", clean_text(name)).strip(" .") or "配置及增减配清单"
+
+
+def export_all_form_column_indexes(ws, form_row, form_columns):
+    columns = []
+    component_col = None
+    name_col = None
+    for col in range(1, ws.max_column + 1):
+        normalized_header = re.sub(r"\s+", "", column_header_text(ws, col, form_row))
+        if normalized_header == "部件":
+            component_col = col
+        elif normalized_header == "名称":
+            name_col = col
+    for col in range(1, ws.max_column + 1):
+        header_text = column_header_text(ws, col, form_row)
+        normalized_header = re.sub(r"\s+", "", header_text)
+        if component_col and name_col and col == component_col:
+            continue
+        if any(keyword in normalized_header for keyword in EXPORT_DROP_KEYWORDS if keyword != "序号"):
+            continue
+        has_data = any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(1, ws.max_row + 1))
+        if header_text or has_data or col in form_columns.values():
+            columns.append(col)
+    return columns
+
+
+def copy_cell_for_export(source_cell, target_cell, value=None):
+    target_cell.value = source_cell.value if value is None else value
+    if source_cell.has_style:
+        target_cell.font = copy(source_cell.font)
+        target_cell.fill = copy(source_cell.fill)
+        target_cell.border = copy(source_cell.border)
+        target_cell.alignment = copy(source_cell.alignment)
+        target_cell.number_format = source_cell.number_format
+        target_cell.protection = copy(source_cell.protection)
+    if source_cell.hyperlink:
+        target_cell._hyperlink = copy(source_cell.hyperlink)
+    if source_cell.comment:
+        target_cell.comment = copy(source_cell.comment)
+
+
+def config_list_title(source_title, model_name, list_type):
+    text = clean_text(source_title)
+    if list_type == "basic":
+        if "选配配置表" in text:
+            return text.replace("选配配置表", "基础配置表")
+        if "增减配" in text:
+            return text.replace("增减配", "基础配置")
+        return text or f"{model_name}塔机基础配置表"
+    if "基础配置表" in text:
+        return text.replace("基础配置表", "选配配置表")
+    if "基本配置表" in text:
+        return text.replace("基本配置表", "选配配置表")
+    if "配置表" in text and "选配配置表" not in text:
+        return text.replace("配置表", "选配配置表", 1)
+    return text or f"{model_name}塔机选配配置表"
+
+
+def selected_config_source_rows(ws, form_row, form_columns, list_type):
+    source_rows = list(range(1, form_row + 1))
+    for row_idx in range(form_row + 1, ws.max_row + 1):
+        full_row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
+        if not full_row_text:
+            continue
+        if "图" in full_row_text or "电源箱总成" in full_row_text:
+            continue
+        marks = [clean_text(ws.cell(row_idx, col).value) for col in form_columns.values()]
+        keyword_match = any(keyword in full_row_text for keyword in EXPORT_OPTION_KEYWORDS)
+        if list_type == "basic" and any("●" in mark for mark in marks):
+            source_rows.append(row_idx)
+        elif list_type == "option" and (any("○" in mark for mark in marks) or keyword_match):
+            source_rows.append(row_idx)
+    return source_rows
+
+
+def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_row, form_columns, list_type, model_name):
+    row_map = {source_row: target_row for target_row, source_row in enumerate(source_rows, start=1)}
+    col_map = {source_col: target_col for target_col, source_col in enumerate(source_columns, start=1)}
+    sequence_col = None
+    for col in source_columns:
+        if "序号" in column_header_text(source_ws, col, form_row):
+            sequence_col = col
+            break
+
+    body_index = 1
+    for target_row, source_row in enumerate(source_rows, start=1):
+        if source_ws.row_dimensions[source_row].height:
+            target_ws.row_dimensions[target_row].height = source_ws.row_dimensions[source_row].height
+        for target_col, source_col in enumerate(source_columns, start=1):
+            source_cell = source_ws.cell(source_row, source_col)
+            value = source_cell.value
+            if source_row == 1 and source_col == source_columns[0]:
+                value = config_list_title(value, model_name, list_type)
+            elif source_row <= form_row:
+                normalized_value = re.sub(r"\s+", "", clean_text(value))
+                if normalized_value == "组成":
+                    value = "产品模块"
+                elif normalized_value == "名称":
+                    value = "部件名称"
+            elif source_row > form_row and source_col == sequence_col:
+                value = body_index
+            elif list_type == "option" and source_row > form_row and source_col in form_columns.values():
+                row_text = " ".join(clean_text(source_ws.cell(source_row, col).value) for col in range(1, source_ws.max_column + 1))
+                if any(keyword in row_text for keyword in EXPORT_OPTION_KEYWORDS):
+                    value = "○"
+            copy_cell_for_export(source_cell, target_ws.cell(target_row, target_col), value=value)
+        if source_row > form_row:
+            body_index += 1
+
+    for source_col, target_col in col_map.items():
+        width = source_ws.column_dimensions[column_label(source_col)].width
+        if width:
+            target_ws.column_dimensions[column_label(target_col)].width = width
+
+    for merged in source_ws.merged_cells.ranges:
+        rows = range(merged.min_row, merged.max_row + 1)
+        cols = range(merged.min_col, merged.max_col + 1)
+        if not all(row in row_map for row in rows):
+            continue
+        if not all(col in col_map for col in cols):
+            continue
+        target_ws.merge_cells(
+            start_row=row_map[merged.min_row],
+            start_column=col_map[merged.min_col],
+            end_row=row_map[merged.max_row],
+            end_column=col_map[merged.max_col],
+        )
+
+    target_ws.freeze_panes = source_ws.freeze_panes
+    target_ws.sheet_view.showGridLines = source_ws.sheet_view.showGridLines
+
+
+def make_combined_config_option_excel(db, model_name, output_path):
+    workbook_bytes = workbook_bytes_for_model(db, model_name)
+    if not workbook_bytes:
+        raise ValueError("当前机型没有已导入的配置表原始数据，无法生成配置及增减配清单。")
+
+    source_wb = load_workbook(BytesIO(workbook_bytes))
+    source_ws = source_wb.active
+    form_row, form_columns = find_config_form_columns(source_ws)
+    if not form_columns:
+        raise ValueError("配置表中未识别到安装形式列，无法生成清单。")
+
+    source_columns = export_all_form_column_indexes(source_ws, form_row, form_columns)
+    if not source_columns:
+        raise ValueError("配置表中没有可导出的列。")
+
+    output_wb = Workbook()
+    basic_ws = output_wb.active
+    basic_ws.title = safe_sheet_title(f"{model_name}配置清单")
+    option_ws = output_wb.create_sheet(safe_sheet_title(f"{model_name}增减配清单"))
+
+    basic_rows = selected_config_source_rows(source_ws, form_row, form_columns, "basic")
+    option_rows = selected_config_source_rows(source_ws, form_row, form_columns, "option")
+    if len(basic_rows) <= form_row:
+        raise ValueError("配置表中没有识别到基础配置实心圈项目。")
+    if len(option_rows) <= form_row:
+        raise ValueError("配置表中没有识别到增减配项目。")
+
+    copy_config_sheet(source_ws, basic_ws, basic_rows, source_columns, form_row, form_columns, "basic", model_name)
+    copy_config_sheet(source_ws, option_ws, option_rows, source_columns, form_row, form_columns, "option", model_name)
+
+    return save_workbook_without_overwrite_conflict(output_wb, output_path)
+
+
 def tower_type_text(tower_type, lang):
     if lang == "zh":
         return tower_type.get("zh", "")
@@ -1558,6 +1730,7 @@ class QuotationApp:
 
         toolbar = ttk.Frame(main)
         toolbar.pack(fill="x", pady=(10, 8))
+        ttk.Button(toolbar, text="配置及增减配清单", command=self.on_generate_combined_config_list).pack(side=LEFT, padx=(0, 8))
         ttk.Button(toolbar, text="生成报价 PDF", command=self.on_generate).pack(side=LEFT, padx=(0, 8))
         ttk.Button(toolbar, text="报价单信息", command=self.open_quote_info_dialog).pack(side=LEFT, padx=(0, 8))
 
@@ -2341,6 +2514,22 @@ class QuotationApp:
             messagebox.showerror(
                 "生成失败",
                 f"机型：{self.model_var.get()}\n安装形式：{self.form_var.get()}\n清单类型：{title}\n错误：{exc}",
+            )
+
+    def on_generate_combined_config_list(self):
+        if not self.model_var.get():
+            messagebox.showwarning("缺少数据", "请先选择产品型号。")
+            return
+        safe_model = safe_filename_stem(self.model_var.get())
+        output = OUTPUT_DIR / f"{safe_model}配置及增减配清单.xlsx"
+        try:
+            output = make_combined_config_option_excel(self.db, self.model_var.get(), output)
+            messagebox.showinfo("生成完成", f"已生成:\n{output}")
+            os.startfile(output)
+        except Exception as exc:
+            messagebox.showerror(
+                "生成失败",
+                f"机型：{self.model_var.get()}\n清单类型：配置及增减配清单\n错误：{exc}",
             )
 
     def on_close(self):
