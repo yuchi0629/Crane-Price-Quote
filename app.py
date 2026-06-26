@@ -1292,17 +1292,29 @@ def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_ro
             target_ws.column_dimensions[column_label(target_col)].width = width
 
     for merged in source_ws.merged_cells.ranges:
-        rows = range(merged.min_row, merged.max_row + 1)
-        cols = range(merged.min_col, merged.max_col + 1)
-        if not all(row in row_map for row in rows):
+        mapped_rows = sorted(
+            row_map[row]
+            for row in range(merged.min_row, merged.max_row + 1)
+            if row in row_map
+        )
+        mapped_cols = sorted(
+            col_map[col]
+            for col in range(merged.min_col, merged.max_col + 1)
+            if col in col_map
+        )
+        if not mapped_rows or not mapped_cols:
             continue
-        if not all(col in col_map for col in cols):
+        rows_are_contiguous = mapped_rows == list(range(mapped_rows[0], mapped_rows[-1] + 1))
+        cols_are_contiguous = mapped_cols == list(range(mapped_cols[0], mapped_cols[-1] + 1))
+        if not rows_are_contiguous or not cols_are_contiguous:
+            continue
+        if mapped_rows[0] == mapped_rows[-1] and mapped_cols[0] == mapped_cols[-1]:
             continue
         target_ws.merge_cells(
-            start_row=row_map[merged.min_row],
-            start_column=col_map[merged.min_col],
-            end_row=row_map[merged.max_row],
-            end_column=col_map[merged.max_col],
+            start_row=mapped_rows[0],
+            start_column=mapped_cols[0],
+            end_row=mapped_rows[-1],
+            end_column=mapped_cols[-1],
         )
 
     target_ws.freeze_panes = source_ws.freeze_panes
