@@ -36,7 +36,7 @@ DB_FILE = DATA_DIR / "quotation_database.json"
 SETTINGS_FILE = DATA_DIR / "user_settings.json"
 INITIAL_DB_FILE = BUNDLE_DIR / "data" / "quotation_database.json"
 WINDOW_ICON_FILE = BUNDLE_DIR / "assets" / "zoomlion.ico"
-CONFIG_DATA_RESET_VERSION = 1
+CONFIG_DATA_RESET_VERSION = 2
 EMBEDDED_LOGO_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAGwAAAAfCAYAAAAC0CiiAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8"
     "YQUAAAAJcEhZcwAADsQAAA7EAZUrDhsAAANKSURBVGhD7ZoxSBtRGMf/7WQLBUsKUWgiImZwEMngECxdQ"
@@ -1259,6 +1259,20 @@ def safe_filename_stem(name):
     return re.sub(r'[<>:"/\\|?*]+', "_", clean_text(name)).strip(" .") or "配置及增减配清单"
 
 
+def infer_model_from_config_filename(path, products):
+    stem = Path(path).stem.replace("（", "(").replace("）", ")")
+    candidates = [
+        stem,
+        re.sub(r"(配置表|配置及增减配清单|配置清单|增减配清单)$", "", stem).strip(),
+    ]
+    product_map = {normalize_key(model): model for model in products}
+    for candidate in candidates:
+        matched = product_map.get(normalize_key(candidate))
+        if matched:
+            return matched
+    return ""
+
+
 def export_all_form_column_indexes(ws, form_row, form_columns, drop_price_only=False):
     columns = []
     component_col = None
@@ -2410,12 +2424,17 @@ class QuotationApp:
             if not path:
                 return
             try:
+                file_model = infer_model_from_config_filename(path, products)
+                auto_matched = bool(file_model and file_model != model_name)
+                if file_model:
+                    model_name = file_model
                 model, count, old_sources = import_tower_config_file(path, model_name=model_name)
                 action = "覆盖旧配置表" if old_sources else "新增配置表"
                 old_text = f"；旧文件：{'、'.join(old_sources)}" if old_sources else ""
-                self.record_change(f"导入当前机型配置表：{model}；{action}；新文件：{Path(path).name}；主要部件 {count} 条{old_text}。")
+                match_text = "；按文件名自动匹配机型" if auto_matched else ""
+                self.record_change(f"导入当前机型配置表：{model}；{action}{match_text}；新文件：{Path(path).name}；主要部件 {count} 条{old_text}。")
                 self.reload_db()
-                messagebox.showinfo("导入完成", f"已将配置表导入到 {model}，共 {count} 条主要部件配置。{action}。")
+                messagebox.showinfo("导入完成", f"已将配置表导入到 {model}，共 {count} 条主要部件配置。{action}{match_text}。")
             except Exception as exc:
                 messagebox.showerror("导入失败", str(exc))
 
