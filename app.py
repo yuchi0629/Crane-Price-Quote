@@ -554,6 +554,12 @@ def save_workbook_without_overwrite_conflict(wb, output_path):
         return fallback
 
 
+def categorized_output_path(category, filename):
+    folder = OUTPUT_DIR / category
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / filename
+
+
 def column_header_text(ws, col, form_row):
     values = [clean_text(ws.cell(row, col).value) for row in range(1, form_row + 1)]
     return " ".join(value for value in values if value)
@@ -1232,7 +1238,7 @@ def export_all_form_column_indexes(ws, form_row, form_columns, drop_price_only=F
         normalized_header = re.sub(r"\s+", "", header_text)
         if not drop_price_only and component_col and name_col and col == component_col:
             continue
-        drop_keywords = ["价格", "基价"] if drop_price_only else [keyword for keyword in EXPORT_DROP_KEYWORDS if keyword != "序号"]
+        drop_keywords = ["编码", "价格", "基价"] if drop_price_only else [keyword for keyword in EXPORT_DROP_KEYWORDS if keyword != "序号"]
         if any(keyword in normalized_header for keyword in drop_keywords):
             continue
         has_data = any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(1, ws.max_row + 1))
@@ -2568,12 +2574,12 @@ class QuotationApp:
         quote = self.build_quote()
         self.save_current_user_settings()
         safe_model = re.sub(r"[^0-9A-Za-z._()-]+", "_", quote.model_name)
-        output = OUTPUT_DIR / f"中联塔机报价单_{safe_model}_{quote.quote_date}.pdf"
+        output = categorized_output_path("报价PDF", f"中联塔机报价单_{safe_model}_{quote.quote_date}.pdf")
         try:
             make_pdf(self.db, quote, output)
             generated = [output]
             if quote.selected_option_items:
-                ltc_output = available_output_path(OUTPUT_DIR / f"LTC选配指导文件_{safe_model}_{quote.quote_date}.pdf")
+                ltc_output = available_output_path(categorized_output_path("LTC选配指导文件", f"LTC选配指导文件_{safe_model}_{quote.quote_date}.pdf"))
                 make_ltc_option_pdf(quote, ltc_output)
                 generated.append(ltc_output)
             messagebox.showinfo("生成完成", "已生成:\n" + "\n".join(str(path) for path in generated))
@@ -2588,7 +2594,7 @@ class QuotationApp:
         title = "基本配置清单" if list_type == "basic" else "增减配清单"
         safe_model = re.sub(r"[^0-9A-Za-z._()-]+", "_", self.model_var.get())
         safe_form = re.sub(r"[^0-9A-Za-z._()-]+", "_", self.form_var.get())
-        output = OUTPUT_DIR / f"{title}_{safe_model}_{safe_form}_{date.today().isoformat()}.xlsx"
+        output = categorized_output_path("配置清单", f"{title}_{safe_model}_{safe_form}_{date.today().isoformat()}.xlsx")
         try:
             output = make_config_list_excel(self.db, self.model_var.get(), self.form_var.get(), list_type, output)
             self.db = load_database()
@@ -2605,7 +2611,7 @@ class QuotationApp:
             messagebox.showwarning("缺少数据", "请先选择产品型号。")
             return
         safe_model = safe_filename_stem(self.model_var.get())
-        output = OUTPUT_DIR / f"{safe_model}配置及增减配清单.xlsx"
+        output = categorized_output_path("配置及增减配清单", f"{safe_model}配置及增减配清单.xlsx")
         try:
             output = make_combined_config_option_excel(self.db, self.model_var.get(), output)
             messagebox.showinfo("生成完成", f"已生成:\n{output}")
