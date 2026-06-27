@@ -7,7 +7,7 @@ from io import BytesIO
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from tkinter import BOTH, LEFT, RIGHT, VERTICAL, BooleanVar, Canvas, StringVar, Text, Tk, Toplevel, filedialog, messagebox, simpledialog
+from tkinter import BOTH, LEFT, RIGHT, VERTICAL, BooleanVar, Canvas, StringVar, Text, Tk, Toplevel, filedialog, messagebox
 from tkinter import ttk
 
 from openpyxl import Workbook, load_workbook
@@ -1797,9 +1797,14 @@ class ScrollableFrame(ttk.Frame):
         self.inner.bind("<Configure>", lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.window_id = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(self.window_id, width=e.width))
+        self.canvas.bind("<MouseWheel>", self.on_mousewheel)
+        self.inner.bind("<MouseWheel>", self.on_mousewheel)
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
         self.scrollbar.pack(side=RIGHT, fill="y")
+
+    def on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
 
 class QuotationApp:
@@ -1953,33 +1958,8 @@ class QuotationApp:
 
         option_box = ttk.LabelFrame(right, text="可选增减配置", padding=10, style="Title.TLabelframe")
         option_box.pack(fill=BOTH, expand=True)
-        option_table_frame = ttk.Frame(option_box)
-        option_table_frame.pack(fill=BOTH, expand=True)
-        self.option_tree = ttk.Treeview(
-            option_table_frame,
-            columns=("selected", "qty", "type", "price", "item", "package"),
-            show="headings",
-            height=12,
-        )
-        option_headings = {
-            "selected": "选择",
-            "qty": "数量",
-            "type": "增减配",
-            "price": "价格",
-            "item": "项目",
-            "package": "包内容",
-        }
-        option_widths = {"selected": 55, "qty": 60, "type": 75, "price": 90, "item": 360, "package": 75}
-        for col in option_headings:
-            self.option_tree.heading(col, text=option_headings[col])
-            self.option_tree.column(col, width=option_widths[col], anchor="w")
-        option_scroll = ttk.Scrollbar(option_table_frame, orient=VERTICAL, command=self.option_tree.yview)
-        self.option_tree.configure(yscrollcommand=option_scroll.set)
-        self.option_tree.pack(side=LEFT, fill=BOTH, expand=True)
-        option_scroll.pack(side=RIGHT, fill="y")
-        self.option_tree.bind("<ButtonRelease-1>", self.on_option_tree_click)
-        self.option_tree.bind("<Double-1>", self.on_option_tree_double_click)
-        self.option_tree.bind("<MouseWheel>", lambda event: self.option_tree.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+        self.option_frame = ScrollableFrame(option_box)
+        self.option_frame.pack(fill=BOTH, expand=True)
 
         bottom_bar = ttk.Frame(main)
         bottom_bar.pack(side="bottom", fill="x", anchor="w")
@@ -2155,28 +2135,38 @@ class QuotationApp:
         self.info_message_label.config(text="")
 
     def refresh_options(self):
-        for item_id in self.option_tree.get_children():
-            self.option_tree.delete(item_id)
+        for child in self.option_frame.inner.winfo_children():
+            child.destroy()
         self.option_vars = []
         self.option_qty_vars = []
         self.option_type_vars = []
         self.config_option_items = []
         if not self.model_var.get() or not self.form_var.get():
+            ttk.Label(self.option_frame.inner, text="请先选择产品型号和安装形式。").pack(anchor="w")
             self.update_current_price()
             return
         try:
             options = option_config_items(self.db, self.model_var.get(), self.form_var.get())
         except Exception as exc:
-            self.option_tree.insert("", "end", values=("", "", "", "", f"无法读取配置表增减配数据：{exc}", ""))
+            ttk.Label(self.option_frame.inner, text=f"无法读取配置表增减配数据：{exc}").pack(anchor="w")
             self.update_current_price()
             return
         self.config_option_items = options
         if not options:
-            self.option_tree.insert("", "end", values=("", "", "", "", "当前安装形式暂无可选增减配置。", ""))
+            ttk.Label(self.option_frame.inner, text="当前安装形式暂无可选增减配置。").pack(anchor="w")
             self.update_current_price()
             return
 
-        for idx, option in enumerate(options):
+        header = ttk.Frame(self.option_frame.inner)
+        header.pack(fill="x", pady=(0, 4))
+        ttk.Label(header, text="选择", width=6).pack(side=LEFT)
+        ttk.Label(header, text="数量", width=8).pack(side=LEFT, padx=(0, 6))
+        ttk.Label(header, text="增减配", width=10).pack(side=LEFT, padx=(0, 6))
+        ttk.Label(header, text="价格", width=12).pack(side=LEFT, padx=(0, 6))
+        ttk.Label(header, text="项目").pack(side=LEFT)
+        for option in options:
+            row = ttk.Frame(self.option_frame.inner)
+            row.pack(fill="x", anchor="w", pady=2)
             var = BooleanVar(value=False)
             qty_var = StringVar(value="1")
             type_var = StringVar(value="增配")
@@ -2186,75 +2176,28 @@ class QuotationApp:
             self.option_vars.append(var)
             self.option_qty_vars.append(qty_var)
             self.option_type_vars.append(type_var)
-            self.option_tree.insert(
-                "",
-                "end",
-                iid=f"option_{idx}",
-                values=(
-                    "否",
-                    qty_var.get(),
-                    type_var.get(),
-                    option.get("price", ""),
-                    option.get("item_display", ""),
-                    "查看" if option.get("children") else "",
-                ),
-            )
+            check = ttk.Checkbutton(row, variable=var)
+            qty = ttk.Spinbox(row, from_=1, to=999, textvariable=qty_var, width=6)
+            change_type = ttk.Combobox(row, textvariable=type_var, values=["增配", "减配"], width=8, state="readonly")
+            price_label = ttk.Label(row, text=option.get("price", ""), width=12)
+            check.pack(side=LEFT)
+            qty.pack(side=LEFT, padx=(0, 8))
+            change_type.pack(side=LEFT, padx=(0, 8))
+            price_label.pack(side=LEFT, padx=(0, 8))
+            for widget in (row, check, qty, change_type, price_label):
+                widget.bind("<MouseWheel>", self.option_frame.on_mousewheel)
+            if option.get("children"):
+                button = ttk.Button(
+                    row,
+                    text="查看包内容",
+                    command=lambda item=option: self.show_option_package_contents(item),
+                )
+                button.pack(side=RIGHT, padx=(8, 0))
+                button.bind("<MouseWheel>", self.option_frame.on_mousewheel)
+            label = ttk.Label(row, text=option.get("item_display", ""), wraplength=360)
+            label.pack(side=LEFT, fill="x", expand=True, anchor="w")
+            label.bind("<MouseWheel>", self.option_frame.on_mousewheel)
         self.update_current_price()
-
-    def option_index_from_iid(self, item_id):
-        match = re.match(r"option_(\d+)$", clean_text(item_id))
-        if not match:
-            return None
-        index = int(match.group(1))
-        return index if 0 <= index < len(self.config_option_items) else None
-
-    def refresh_option_tree_row(self, index):
-        if index is None or index >= len(self.config_option_items):
-            return
-        item_id = f"option_{index}"
-        if not self.option_tree.exists(item_id):
-            return
-        option = self.config_option_items[index]
-        self.option_tree.item(
-            item_id,
-            values=(
-                "是" if self.option_vars[index].get() else "否",
-                self.option_qty_vars[index].get(),
-                self.option_type_vars[index].get(),
-                option.get("price", ""),
-                option.get("item_display", ""),
-                "查看" if option.get("children") else "",
-            ),
-        )
-
-    def on_option_tree_click(self, event):
-        item_id = self.option_tree.identify_row(event.y)
-        column = self.option_tree.identify_column(event.x)
-        index = self.option_index_from_iid(item_id)
-        if index is None:
-            return
-        if column == "#1":
-            self.option_vars[index].set(not self.option_vars[index].get())
-            self.refresh_option_tree_row(index)
-        elif column == "#3":
-            self.option_type_vars[index].set("减配" if self.option_type_vars[index].get() == "增配" else "增配")
-            self.refresh_option_tree_row(index)
-        elif column == "#6" and self.config_option_items[index].get("children"):
-            self.show_option_package_contents(self.config_option_items[index])
-
-    def on_option_tree_double_click(self, event):
-        item_id = self.option_tree.identify_row(event.y)
-        column = self.option_tree.identify_column(event.x)
-        index = self.option_index_from_iid(item_id)
-        if index is None:
-            return
-        if column == "#2":
-            value = simpledialog.askinteger("修改数量", "请输入数量：", initialvalue=int(parse_price_value(self.option_qty_vars[index].get()) or 1), minvalue=1, maxvalue=999, parent=self.root)
-            if value is not None:
-                self.option_qty_vars[index].set(str(value))
-                self.refresh_option_tree_row(index)
-        elif column in ("#5", "#6") and self.config_option_items[index].get("children"):
-            self.show_option_package_contents(self.config_option_items[index])
 
     def show_option_package_contents(self, option):
         children = option.get("children") or []
