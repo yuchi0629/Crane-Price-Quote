@@ -2739,12 +2739,13 @@ class QuotationApp:
         quote = self.build_quote()
         self.save_current_user_settings()
         safe_model = re.sub(r"[^0-9A-Za-z._()-]+", "_", quote.model_name)
-        output = categorized_output_path("报价PDF", f"中联塔机报价单_{safe_model}_{quote.quote_date}.pdf")
+        generated_at = datetime.now().strftime("%Y-%m-%d_%H%M")
+        output = categorized_output_path("报价PDF", f"中联塔机报价单_{safe_model}_{generated_at}.pdf")
         try:
             make_pdf(self.db, quote, output)
             generated = [output]
             if quote.selected_option_items:
-                ltc_output = available_output_path(categorized_output_path("LTC选配指导文件", f"LTC选配指导文件_{safe_model}_{quote.quote_date}.pdf"))
+                ltc_output = available_output_path(categorized_output_path("LTC选配指导文件", f"LTC选配指导文件_{safe_model}_{generated_at}.pdf"))
                 make_ltc_option_pdf(quote, ltc_output)
                 generated.append(ltc_output)
             messagebox.showinfo("生成完成", "已生成:\n" + "\n".join(str(path) for path in generated))
