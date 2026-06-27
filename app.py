@@ -275,7 +275,7 @@ def default_user_settings():
         "quote_company": "中联重科建筑起重机械有限公司",
         "quote_person": "Lewis",
         "quote_phone": "+86 123456789",
-        "quote_email": "Lewisliu@zoomlion.com",
+        "quote_email": "liuyuchi@zoomlion.com",
     }
 
 
@@ -292,8 +292,10 @@ def load_user_settings():
             pass
     if settings.get("quote_company") == "中联重科建筑起重机械公司":
         settings["quote_company"] = "中联重科建筑起重机械有限公司"
+    if settings.get("quote_email") == "Lewisliu@zoomlion.com":
+        settings["quote_email"] = "liuyuchi@zoomlion.com"
     if not settings.get("quote_email"):
-        settings["quote_email"] = "Lewisliu@zoomlion.com"
+        settings["quote_email"] = "liuyuchi@zoomlion.com"
     return settings
 
 
@@ -1262,7 +1264,21 @@ def safe_sheet_title(title):
 
 
 def safe_filename_stem(name):
-    return re.sub(r'[<>:"/\\|?*]+', "_", clean_text(name)).strip(" .") or "配置及增减配清单"
+    text = re.sub(r'[<>:"/\\|?*]+', "_", clean_text(name))
+    text = re.sub(r"\s+", "_", text)
+    return text.strip(" ._") or "配置及增减配清单"
+
+
+def workbook_version_filename_suffix(db, model_name):
+    workbook_bytes = workbook_bytes_for_model(db, model_name)
+    if not workbook_bytes:
+        return ""
+    try:
+        wb = load_workbook(BytesIO(workbook_bytes), data_only=True, read_only=True)
+        value = clean_text(wb.worksheets[0].cell(2, 1).value)
+    except Exception:
+        return ""
+    return safe_filename_stem(value)
 
 
 def infer_model_from_config_filename(path, products):
@@ -2760,7 +2776,9 @@ class QuotationApp:
             messagebox.showwarning("缺少数据", "请先选择产品型号。")
             return
         safe_model = safe_filename_stem(self.model_var.get())
-        output = categorized_output_path("配置及增减配清单", f"{safe_model}配置及增减配清单.xlsx")
+        version_suffix = workbook_version_filename_suffix(self.db, self.model_var.get())
+        suffix_text = f"_{version_suffix}" if version_suffix else ""
+        output = categorized_output_path("配置及增减配清单", f"{safe_model}配置及增减配清单{suffix_text}.xlsx")
         try:
             output = make_combined_config_option_excel(self.db, self.model_var.get(), output)
             messagebox.showinfo("生成完成", f"已生成:\n{output}")
