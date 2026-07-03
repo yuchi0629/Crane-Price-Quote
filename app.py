@@ -10,6 +10,7 @@ from pathlib import Path
 from tkinter import BOTH, LEFT, RIGHT, VERTICAL, BooleanVar, Canvas, StringVar, Text, Tk, Toplevel, filedialog, messagebox
 from tkinter import ttk
 
+from PIL import Image as PILImage, ImageTk
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
 from copy import copy
@@ -36,6 +37,8 @@ DB_FILE = DATA_DIR / "quotation_database.json"
 SETTINGS_FILE = DATA_DIR / "user_settings.json"
 INITIAL_DB_FILE = BUNDLE_DIR / "data" / "quotation_database.json"
 WINDOW_ICON_FILE = BUNDLE_DIR / "assets" / "zoomlion.ico"
+HEADER_ICON_FILE = BUNDLE_DIR / "assets" / "crane.png"
+APP_TITLE = "中联塔机配置清单及报价表软件"
 CONFIG_DATA_RESET_VERSION = 2
 EMBEDDED_LOGO_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAGwAAAAfCAYAAAAC0CiiAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8"
@@ -1851,7 +1854,7 @@ class ScrollableFrame(ttk.Frame):
 class QuotationApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("中联塔机报价单生成软件")
+        self.root.title(APP_TITLE)
         self.set_window_icon()
         self.root.geometry("1180x760")
         ensure_dirs()
@@ -1892,6 +1895,7 @@ class QuotationApp:
         self.quote_dialog = None
         self.research_operator_id = ""
         self.research_operation_time = ""
+        self.header_icon_image = None
         self.build_ui()
         self.refresh_models()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -1909,7 +1913,17 @@ class QuotationApp:
         style.configure("DialogTitle.TLabel", font=("Microsoft YaHei UI", 12, "bold"))
         main = ttk.Frame(self.root, padding=12)
         main.pack(fill=BOTH, expand=True)
-        ttk.Label(main, text="中联塔机报价单生成软件", font=("Microsoft YaHei UI", 18, "bold")).pack(anchor="w")
+        title_row = ttk.Frame(main)
+        title_row.pack(anchor="w", fill="x")
+        try:
+            if HEADER_ICON_FILE.exists():
+                icon = PILImage.open(HEADER_ICON_FILE)
+                icon.thumbnail((62, 62), PILImage.LANCZOS)
+                self.header_icon_image = ImageTk.PhotoImage(icon)
+                ttk.Label(title_row, image=self.header_icon_image).pack(side=LEFT, padx=(0, 10))
+        except Exception:
+            self.header_icon_image = None
+        ttk.Label(title_row, text=APP_TITLE, font=("Microsoft YaHei UI", 18, "bold")).pack(side=LEFT)
 
         toolbar = ttk.Frame(main)
         toolbar.pack(fill="x", pady=(10, 8))
