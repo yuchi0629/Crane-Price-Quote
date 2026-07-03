@@ -206,6 +206,133 @@ TRANSLATIONS = {
         "fr": "ZOOMLION Construction Hoisting Machinery Company",
         "de": "ZOOMLION Construction Hoisting Machinery Company",
     },
+    "中联重科建筑起重机械有限公司": {
+        "en": "ZOOMLION Construction Hoisting Machinery Co., Ltd.",
+        "fr": "ZOOMLION Construction Hoisting Machinery Co., Ltd.",
+        "de": "ZOOMLION Construction Hoisting Machinery Co., Ltd.",
+    },
+    "中联塔机配置清单及报价表软件": {
+        "en": "ZOOMLION Tower Crane Configuration List and Quotation Software",
+        "fr": "Logiciel de liste de configuration et devis pour grues a tour ZOOMLION",
+        "de": "ZOOMLION Software fuer Turmdrehkran-Konfigurationslisten und Angebote",
+    },
+    "配置清单": {"en": "Configuration list", "fr": "Liste de configuration", "de": "Konfigurationsliste"},
+    "基本配置清单": {"en": "Basic configuration list", "fr": "Liste de configuration de base", "de": "Grundkonfigurationsliste"},
+    "增减配清单": {"en": "Addition / deduction list", "fr": "Liste des ajouts / deductions", "de": "Zusatz- / Abwahlliste"},
+    "配置及增减配清单": {"en": "Configuration and addition / deduction list", "fr": "Liste de configuration et ajouts / deductions", "de": "Konfiguration und Zusatz- / Abwahlliste"},
+    "配置表": {"en": "configuration list", "fr": "liste de configuration", "de": "Konfigurationsliste"},
+    "平头塔式起重机配置表": {"en": "flat-top tower crane configuration list", "fr": "liste de configuration de grue a tour a tete plate", "de": "Konfigurationsliste fuer Flat-Top-Turmdrehkran"},
+    "平头塔式起重机": {"en": "flat-top tower crane", "fr": "grue a tour a tete plate", "de": "Flat-Top-Turmdrehkran"},
+    "版本号": {"en": "Version", "fr": "Version", "de": "Version"},
+    "发布日期": {"en": "Release date", "fr": "Date de publication", "de": "Veroeffentlichungsdatum"},
+    "序号": {"en": "No.", "fr": "No.", "de": "Nr."},
+    "组成": {"en": "Module", "fr": "Module", "de": "Modul"},
+    "产品模块": {"en": "Product module", "fr": "Module produit", "de": "Produktmodul"},
+    "名称": {"en": "Name", "fr": "Nom", "de": "Name"},
+    "编码": {"en": "Item No.", "fr": "Reference", "de": "Artikelnummer"},
+    "编 码": {"en": "Item No.", "fr": "Reference", "de": "Artikelnummer"},
+    "标配": {"en": "Standard", "fr": "Standard", "de": "Standard"},
+    "选配": {"en": "Optional", "fr": "Optionnel", "de": "Optional"},
+    "不配": {"en": "Not included", "fr": "Non inclus", "de": "Nicht enthalten"},
+    "基价": {"en": "Base price", "fr": "Prix de base", "de": "Grundpreis"},
+    "不含税": {"en": "tax excluded", "fr": "hors taxe", "de": "ohne Steuer"},
+    "FOB基价（不含税）": {"en": "FOB base price (tax excluded)", "fr": "Prix de base FOB (hors taxe)", "de": "FOB-Grundpreis (ohne Steuer)"},
+    "“●”标配 “○”选配 “-”不配": {
+        "en": "\"●\" standard  \"○\" optional  \"-\" not included",
+        "fr": "\"●\" standard  \"○\" optionnel  \"-\" non inclus",
+        "de": "\"●\" Standard  \"○\" Optional  \"-\" nicht enthalten",
+    },
+    "产品型号：": {"en": "Model: ", "fr": "Modele: ", "de": "Modell: "},
+    "安装形式：": {"en": "Installation form: ", "fr": "Type d'installation: ", "de": "Aufstellungsart: "},
+    "来源配置表：": {"en": "Source workbook: ", "fr": "Classeur source: ", "de": "Quellarbeitsmappe: "},
+    "日期": {"en": "Date", "fr": "Date", "de": "Datum"},
+    "LTC选配指导文件": {"en": "LTC Optional Parts Guide", "fr": "Guide des options LTC", "de": "LTC-Leitfaden fuer optionale Teile"},
+    "部件": {"en": "Component", "fr": "Composant", "de": "Komponente"},
+    "项目": {"en": "Item", "fr": "Article", "de": "Position"},
+    "支腿 固定式": {"en": "Fixing-angle stationary", "fr": "Fixe sur pieds d'ancrage", "de": "Stationaer mit Fundamentankern"},
+    "底架 固定式": {"en": "Base-frame stationary", "fr": "Fixe sur chassis de base", "de": "Stationaer mit Grundrahmen"},
+    "支腿": {"en": "Fixing angle", "fr": "Pied d'ancrage", "de": "Fundamentanker"},
+    "螺栓固定式": {"en": "Bolted stationary", "fr": "Fixe boulonne", "de": "Stationaer verschraubt"},
+    "预埋支腿式": {"en": "Embedded fixing-angle type", "fr": "Type pieds d'ancrage encastres", "de": "Typ mit einbetonierten Fundamentankern"},
+    "固定式": {"en": "Stationary", "fr": "Fixe", "de": "Stationaer"},
+    "附着式": {"en": "Anchored", "fr": "Ancre", "de": "Verankert"},
+    "内爬式": {"en": "Internal climbing", "fr": "Grimpant interieur", "de": "Innenkletternd"},
+    "行走式": {"en": "Travelling", "fr": "Mobile sur rails", "de": "Fahrbar"},
+    "上装总成": {"en": "Upper structure assembly", "fr": "Ensemble superstructure", "de": "Oberwagenbaugruppe"},
+    "塔身": {"en": "Mast", "fr": "Mat", "de": "Mast"},
+    "总成": {"en": "Assembly", "fr": "Ensemble", "de": "Baugruppe"},
+    "塔身 总成": {"en": "Mast assembly", "fr": "Ensemble de mat", "de": "Mastbaugruppe"},
+    "塔身总成": {"en": "Mast assembly", "fr": "Ensemble de mat", "de": "Mastbaugruppe"},
+    "安全": {"en": "Safety", "fr": "Securite", "de": "Sicherheit"},
+    "装置": {"en": "Device", "fr": "Dispositif", "de": "Vorrichtung"},
+    "安全 装置": {"en": "Safety device", "fr": "Dispositif de securite", "de": "Sicherheitsvorrichtung"},
+    "安全装置": {"en": "Safety device", "fr": "Dispositif de securite", "de": "Sicherheitsvorrichtung"},
+    "标牌": {"en": "Nameplates", "fr": "Plaques signaletiques", "de": "Schilder"},
+    "机构及钢丝绳": {"en": "Mechanisms and wire ropes", "fr": "Mecanismes et cables acier", "de": "Mechanismen und Stahldrahtseile"},
+    "电控系统": {"en": "Electric control system", "fr": "Systeme de commande electrique", "de": "Elektrisches Steuerungssystem"},
+    "电气部件": {"en": "Electric parts", "fr": "Composants electriques", "de": "Elektrische Teile"},
+    "驱动机构": {"en": "Drive mechanism", "fr": "Mecanisme d'entrainement", "de": "Antriebsmechanismus"},
+    "上装附件": {"en": "Upper structure accessories", "fr": "Accessoires de superstructure", "de": "Oberwagenzubehoer"},
+    "绳夹": {"en": "Wire rope clip", "fr": "Serre-cable", "de": "Seilklemme"},
+    "信号接收器安装座": {"en": "Signal receiver mounting bracket", "fr": "Support de montage du recepteur de signal", "de": "Montagehalter fuer Signalempfaenger"},
+    "回转制动器显示灯安装座": {"en": "Slewing brake indicator mounting bracket", "fr": "Support du voyant de frein d'orientation", "de": "Halter fuer Drehbrems-Kontrollleuchte"},
+    "三色灯安装座": {"en": "Three-color light mounting bracket", "fr": "Support du feu tricolore", "de": "Halter fuer dreifarbige Leuchte"},
+    "载重小车": {"en": "Trolley", "fr": "Chariot", "de": "Laufkatze"},
+    "圆榫基础节": {"en": "Round-tenon base mast section", "fr": "Element de base a tenon rond", "de": "Rundzapfen-Grundmastsegment"},
+    "RA外挂式平台": {"en": "RA external platform", "fr": "Plateforme externe RA", "de": "RA-Aussenplattform"},
+    "RA支腿座": {"en": "RA fixing-angle seat", "fr": "Support de pied d'ancrage RA", "de": "RA-Fundamentankeraufnahme"},
+    "支腿座": {"en": "Fixing-angle seat", "fr": "Support de pied d'ancrage", "de": "Fundamentankeraufnahme"},
+    "开关安装盒": {"en": "Switch mounting box", "fr": "Boitier de montage d'interrupteur", "de": "Schaltermontagekasten"},
+    "起重量传感器总成(含线缆)": {"en": "Load sensor assembly (with cable)", "fr": "Ensemble capteur de charge (avec cable)", "de": "Lastsensorbaugruppe (mit Kabel)"},
+    "含线缆": {"en": "with cable", "fr": "avec cable", "de": "mit Kabel"},
+    "起重量限制器拉环": {"en": "Load moment limiter pull ring", "fr": "Anneau de traction du limiteur de charge", "de": "Zugring fuer Lastbegrenzer"},
+    "回转限位装置": {"en": "Slewing limit device", "fr": "Dispositif de limitation d'orientation", "de": "Drehbegrenzungsvorrichtung"},
+    "起升绝对值编码器": {"en": "Hoisting absolute encoder", "fr": "Codeur absolu de levage", "de": "Absolutwertgeber fuer Hubwerk"},
+    "回转绝对值编码器": {"en": "Slewing absolute encoder", "fr": "Codeur absolu d'orientation", "de": "Absolutwertgeber fuer Drehwerk"},
+    "变幅绝对值编码器": {"en": "Trolleying absolute encoder", "fr": "Codeur absolu de variation de portee", "de": "Absolutwertgeber fuer Katzfahrwerk"},
+    "起重特性牌": {"en": "Load chart plate", "fr": "Plaque des caracteristiques de charge", "de": "Lastdiagrammschild"},
+    "CE铭牌": {"en": "CE nameplate", "fr": "Plaque signaletique CE", "de": "CE-Typenschild"},
+    "CE铭牌安装架": {"en": "CE nameplate mounting bracket", "fr": "Support de plaque CE", "de": "Halter fuer CE-Typenschild"},
+    "幅度指示牌": {"en": "Radius indicator plate", "fr": "Plaque d'indication de portee", "de": "Ausladungsanzeige"},
+    "司机安全操作规程牌": {"en": "Operator safety instruction plate", "fr": "Plaque des consignes de securite operateur", "de": "Sicherheitsanweisungsschild fuer Kranfuehrer"},
+    "序号牌": {"en": "Serial number plate", "fr": "Plaque de numero de serie", "de": "Seriennummernschild"},
+    "司机室电源箱总成": {"en": "Cabin power box assembly", "fr": "Ensemble coffret d'alimentation cabine", "de": "Kabinen-Stromkastenbaugruppe"},
+    "司机室插头电缆包": {"en": "Cabin plug cable package", "fr": "Kit cable avec fiche cabine", "de": "Kabinen-Steckerkabelsatz"},
+    "无线遥控附件包": {"en": "Wireless remote-control accessory package", "fr": "Kit accessoires de radiocommande", "de": "Zubehoerpaket fuer Funkfernsteuerung"},
+    "电源箱总成": {"en": "Power box assembly", "fr": "Ensemble coffret d'alimentation", "de": "Stromkastenbaugruppe"},
+    "风速仪": {"en": "Anemometer", "fr": "Anemometre", "de": "Windmesser"},
+    "风速仪电缆": {"en": "Anemometer cable", "fr": "Cable d'anemometre", "de": "Windmesserkabel"},
+    "电阻器": {"en": "Resistor", "fr": "Resistance", "de": "Widerstand"},
+    "主电缆": {"en": "Main cable", "fr": "Cable principal", "de": "Hauptkabel"},
+    "4.5m城市底架压重": {"en": "4.5m city base-frame ballast", "fr": "Lest de chassis urbain 4,5 m", "de": "Ballast fuer 4,5-m-Stadtgrundrahmen"},
+    "DJ-4.5m压重": {"en": "DJ-4.5m ballast", "fr": "Lest DJ-4,5 m", "de": "DJ-4,5-m-Ballast"},
+    "平衡重框": {"en": "Counterweight frame", "fr": "Cadre de contrepoids", "de": "Gegengewichtsrahmen"},
+    "防碰撞系统": {"en": "Anti-collision system", "fr": "Systeme anticollision", "de": "Antikollisionssystem"},
+    "1.5P有氟分体式空调": {"en": "1.5P fluorinated split air conditioner", "fr": "Climatiseur split fluore 1,5P", "de": "1,5P fluorierte Split-Klimaanlage"},
+    "预埋支腿定位框": {"en": "Embedded fixing-angle positioning frame", "fr": "Cadre de positionnement des pieds d'ancrage encastres", "de": "Positionierrahmen fuer einbetonierte Fundamentanker"},
+    "Autec无线遥控器": {"en": "Autec wireless remote control", "fr": "Radiocommande Autec", "de": "Autec-Funkfernsteuerung"},
+    "爬升 部件包": {"en": "Climbing package", "fr": "Kit de grimpement", "de": "Kletterpaket"},
+    "爬升": {"en": "Climbing", "fr": "Grimpement", "de": "Klettern"},
+    "部件包": {"en": "Package", "fr": "Kit", "de": "Paket"},
+    "爬升包": {"en": "Climbing package", "fr": "Kit de grimpement", "de": "Kletterpaket"},
+    "爬升架": {"en": "Climbing frame", "fr": "Cage de grimpement", "de": "Kletterrahmen"},
+    "顶升机构": {"en": "Jacking mechanism", "fr": "Mecanisme de hissage", "de": "Hydraulisches Kletterwerk"},
+    "顶升油缸": {"en": "Jacking cylinder", "fr": "Verin de hissage", "de": "Kletterzylinder"},
+    "泵站": {"en": "Pump station", "fr": "Station de pompage", "de": "Pumpenstation"},
+    "胶管总成": {"en": "Hose assembly", "fr": "Ensemble flexible", "de": "Schlauchbaugruppe"},
+    "过渡节": {"en": "Transition mast section", "fr": "Element de transition", "de": "Uebergangsmastsegment"},
+    "引进系统": {"en": "Mast introduction system", "fr": "Systeme d'introduction des elements", "de": "Einfuehrsystem fuer Mastsegmente"},
+    "安装平台": {"en": "Installation platform", "fr": "Plateforme d'installation", "de": "Montageplattform"},
+    "中央集电环配套物资": {"en": "Central collector-ring supporting parts", "fr": "Pieces associees au collecteur central", "de": "Zubehoer fuer zentralen Schleifring"},
+    "中央集电环包": {"en": "Central collector-ring package", "fr": "Kit collecteur central", "de": "Zentrales Schleifringpaket"},
+    "中央集电环": {"en": "Central collector ring", "fr": "Collecteur central", "de": "Zentraler Schleifring"},
+    "W45回转绝对值编码器电缆": {"en": "W45 slewing absolute encoder cable", "fr": "Cable du codeur absolu d'orientation W45", "de": "W45-Kabel fuer Drehabsolutwertgeber"},
+    "圆榫非标节": {"en": "Round-tenon non-standard mast section", "fr": "Element de mat non standard a tenon rond", "de": "Nicht standardisiertes Rundzapfen-Mastsegment"},
+    "RA-3半节": {"en": "RA-3 half mast section", "fr": "Demi-element RA-3", "de": "RA-3 Halbsegment"},
+    "RA-2半节": {"en": "RA-2 half mast section", "fr": "Demi-element RA-2", "de": "RA-2 Halbsegment"},
+    "电动扒杆包": {"en": "Electric derrick package", "fr": "Kit derrick electrique", "de": "Elektrisches Derrickpaket"},
+    "1T电动扒杆": {"en": "1t electric derrick", "fr": "Derrick electrique 1 t", "de": "1-t-Elektroderrick"},
+    "电动扒杆电控系统": {"en": "Electric derrick control system", "fr": "Systeme de commande du derrick electrique", "de": "Steuerungssystem fuer Elektroderrick"},
 }
 
 
@@ -970,21 +1097,45 @@ def tr_text(text, lang, fallback=None):
         return text
     if text in TRANSLATIONS:
         return TRANSLATIONS[text].get(lang) or TRANSLATIONS[text].get("en") or text
+    if "\n" in text:
+        return "\n".join(tr_text(part, lang) for part in text.split("\n"))
     if "\\" in text:
         return "\\".join(tr_text(part, lang) for part in text.split("\\"))
     replaced = text
     for zh in sorted(TRANSLATIONS, key=len, reverse=True):
         if zh in replaced:
             replacement = TRANSLATIONS[zh].get(lang) or TRANSLATIONS[zh].get("en") or zh
-            replaced = replaced.replace(zh, replacement)
+            def contextual_replacement(match, value=replacement):
+                prefix = " " if match.start() > 0 and re.search(r"[0-9A-Za-z)]$", replaced[:match.start()]) and re.search(r"^[0-9A-Za-z]", value) else ""
+                suffix = " " if match.end() < len(replaced) and re.search(r"[0-9A-Za-z]$", value) and re.search(r"^[0-9A-Za-z(]", replaced[match.end():]) else ""
+                return f"{prefix}{value}{suffix}"
+
+            replaced = re.sub(re.escape(zh), contextual_replacement, replaced)
     if replaced != text:
-        return replaced
+        return remove_remaining_cjk(replaced, lang, fallback)
     if "-" in text:
         parts = text.split("-")
         converted = [tr_text(part.strip(), lang) for part in parts]
         if converted != parts:
-            return " - ".join(converted)
-    return fallback or text
+            return remove_remaining_cjk(" - ".join(converted), lang, fallback)
+    return remove_remaining_cjk(fallback or text, lang)
+
+
+def remove_remaining_cjk(text, lang, fallback=None):
+    text = clean_text(text)
+    fallback = clean_text(fallback)
+    if not re.search(r"[\u4e00-\u9fff]", text):
+        return text
+    if fallback and not re.search(r"[\u4e00-\u9fff]", fallback):
+        return fallback
+    unknown = {
+        "en": "Untranslated item",
+        "fr": "Element non traduit",
+        "de": "Nicht uebersetzter Eintrag",
+    }.get(lang, "Untranslated item")
+    text = re.sub(r"[\u4e00-\u9fff]+", unknown, text)
+    text = re.sub(rf"(?:{re.escape(unknown)}[\s:：,，;；()（）-]*)+", unknown, text)
+    return text.strip(" :：,，;；-()（）") or unknown
 
 
 def find_export_config(db, model_name):
@@ -1130,12 +1281,12 @@ def ensure_export_config(db, model_name):
     return refreshed_db, cfg
 
 
-def make_config_list_excel(db, model_name, install_form, list_type, output_path):
+def make_config_list_excel(db, model_name, install_form, list_type, output_path, lang="zh"):
     try:
         db, cfg = ensure_export_config(db, model_name)
     except ValueError:
         if list_type == "basic":
-            return make_basic_list_from_component_summary(db, model_name, install_form, output_path)
+            return make_basic_list_from_component_summary(db, model_name, install_form, output_path, lang=lang)
         raise
     form_key = normalize_form(install_form)
     form_data = cfg.get("forms", {}).get(form_key)
@@ -1154,7 +1305,7 @@ def make_config_list_excel(db, model_name, install_form, list_type, output_path)
     if not rows:
         raise ValueError("没有符合条件的行项目可导出。")
 
-    title = "基本配置清单" if list_type == "basic" else "增减配清单"
+    title = tr_text("基本配置清单" if list_type == "basic" else "增减配清单", lang)
     wb = Workbook()
     ws = wb.active
     ws.title = title
@@ -1170,11 +1321,18 @@ def make_config_list_excel(db, model_name, install_form, list_type, output_path)
         display_rows = rows
     max_cols = max([len(row) for row in display_header_rows + display_rows] or [1])
 
+    display_header_rows = [[tr_text(value, lang) if isinstance(value, str) else value for value in row] for row in display_header_rows]
+    display_rows = [[tr_text(value, lang) if isinstance(value, str) else value for value in row] for row in display_rows]
+
     ws.append([title])
     if list_type == "basic":
-        ws.append([f"产品型号：{model_name}", f"安装形式：{install_form}"])
+        ws.append([f"{label('产品型号', 'Model', lang)}: {model_name}", f"{label('安装形式', 'Installation form', lang)}: {tr_text(install_form, lang)}"])
     else:
-        ws.append([f"产品型号：{model_name}", f"安装形式：{install_form}", f"来源配置表：{cfg.get('source_file', '')}"])
+        ws.append([
+            f"{label('产品型号', 'Model', lang)}: {model_name}",
+            f"{label('安装形式', 'Installation form', lang)}: {tr_text(install_form, lang)}",
+            f"{tr_text('来源配置表：', lang)}{cfg.get('source_file', '')}",
+        ])
     ws.append([])
     for row in display_header_rows:
         ws.append(row)
@@ -1225,24 +1383,24 @@ def make_config_list_excel(db, model_name, install_form, list_type, output_path)
     return save_workbook_without_overwrite_conflict(wb, output_path)
 
 
-def make_basic_list_from_component_summary(db, model_name, install_form, output_path):
+def make_basic_list_from_component_summary(db, model_name, install_form, output_path, lang="zh"):
     components = select_components(db, model_name, install_form)
     if not components:
         raise ValueError("当前机型已导入配置表摘要，但没有可生成基本配置清单的主要部件数据。")
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "基本配置清单"
-    ws.append(["基本配置清单"])
-    ws.append([f"产品型号：{model_name}", f"安装形式：{install_form}"])
+    ws.title = safe_sheet_title(tr_text("基本配置清单", lang))
+    ws.append([tr_text("基本配置清单", lang)])
+    ws.append([f"{label('产品型号', 'Model', lang)}: {model_name}", f"{label('安装形式', 'Installation form', lang)}: {tr_text(install_form, lang)}"])
     ws.append([])
-    ws.append(["序号", "部件", "名称", "代号", "数量", "标配"])
+    ws.append([label("序号", "No.", lang), label("部件", "Component", lang), label("名称", "Name", lang), label("代号", "Code", lang), label("数量", "Qty", lang), label("标配", "Standard", lang)])
     for idx, item in enumerate(components, start=1):
         ws.append([
             idx,
-            item.get("component_zh", ""),
-            item.get("part_name", ""),
-            item.get("code", ""),
+            tr_text(item.get("component_zh", ""), lang, item.get("component_en", "")),
+            tr_text(item.get("part_name", ""), lang),
+            tr_text(item.get("code", ""), lang),
             item.get("quantity", ""),
             "●",
         ])
@@ -1391,7 +1549,7 @@ def selected_config_source_rows(ws, form_row, form_columns, list_type):
     return source_rows
 
 
-def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_row, form_columns, list_type, model_name, normalize_headers=True, renumber=True):
+def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_row, form_columns, list_type, model_name, normalize_headers=True, renumber=True, lang="zh"):
     row_map = {source_row: target_row for target_row, source_row in enumerate(source_rows, start=1)}
     col_map = {source_col: target_col for target_col, source_col in enumerate(source_columns, start=1)}
     sequence_col = None
@@ -1421,6 +1579,8 @@ def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_ro
                 row_text = " ".join(clean_text(source_ws.cell(source_row, col).value) for col in range(1, source_ws.max_column + 1))
                 if any(keyword in row_text for keyword in EXPORT_OPTION_KEYWORDS):
                     value = "○"
+            if isinstance(value, str):
+                value = tr_text(value, lang)
             copy_cell_for_export(source_cell, target_ws.cell(target_row, target_col), value=value)
         if source_row > form_row:
             body_index += 1
@@ -1461,7 +1621,7 @@ def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_ro
     normalize_export_sheet_style(target_ws)
 
 
-def make_combined_config_option_excel(db, model_name, output_path):
+def make_combined_config_option_excel(db, model_name, output_path, lang="zh"):
     workbook_bytes = workbook_bytes_for_model(db, model_name)
     if not workbook_bytes:
         raise ValueError("当前机型没有已导入的配置表原始数据，无法生成配置及增减配清单。")
@@ -1484,8 +1644,8 @@ def make_combined_config_option_excel(db, model_name, output_path):
 
     output_wb = Workbook()
     basic_ws = output_wb.active
-    basic_ws.title = safe_sheet_title(f"{model_name}配置清单")
-    option_ws = output_wb.create_sheet(safe_sheet_title(f"{model_name}增减配清单"))
+    basic_ws.title = safe_sheet_title(f"{model_name}{tr_text('配置清单', lang)}")
+    option_ws = output_wb.create_sheet(safe_sheet_title(f"{model_name}{tr_text('增减配清单', lang)}"))
 
     basic_rows = selected_config_source_rows(basic_source_ws, basic_form_row, basic_form_columns, "basic")
     option_rows = selected_config_source_rows(option_source_ws, option_form_row, option_form_columns, "option")
@@ -1505,6 +1665,7 @@ def make_combined_config_option_excel(db, model_name, output_path):
         model_name,
         normalize_headers=False,
         renumber=False,
+        lang=lang,
     )
     copy_config_sheet(
         option_source_ws,
@@ -1517,6 +1678,7 @@ def make_combined_config_option_excel(db, model_name, output_path):
         model_name,
         normalize_headers=False,
         renumber=False,
+        lang=lang,
     )
 
     return save_workbook_without_overwrite_conflict(output_wb, output_path)
@@ -1779,6 +1941,7 @@ def table_style(spans=None):
 
 def make_ltc_option_pdf(quote, output_path):
     ensure_dirs()
+    lang = quote.language
     font_name = register_fonts()
     styles = getSampleStyleSheet()
     normal = ParagraphStyle("normal", parent=styles["Normal"], fontName=font_name, fontSize=8, leading=9.5)
@@ -1797,21 +1960,26 @@ def make_ltc_option_pdf(quote, output_path):
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="normal")
     doc.addPageTemplates([PageTemplate(id="ltc", frames=[frame])])
     story = [
-        Paragraph("LTC选配指导文件", title_style),
-        Paragraph(f"产品型号：{quote.model_name}　安装形式：{quote.install_form}　日期：{quote.quote_date}", normal),
+        Paragraph(tr_text("LTC选配指导文件", lang), title_style),
+        Paragraph(
+            f"{label('产品型号', 'Model', lang)}: {quote.model_name}  "
+            f"{label('安装形式', 'Installation form', lang)}: {tr_text(quote.install_form, lang)}  "
+            f"{label('日期', 'Date', lang)}: {quote.quote_date}",
+            normal,
+        ),
     ]
 
     def ltc_text(value):
-        return clean_text(value).replace("图", "")
+        return tr_text(clean_text(value).replace("图", ""), lang)
 
     rows = [[
         make_paragraph("No.", center),
-        make_paragraph("增减配", center),
-        make_paragraph("部件", center),
-        make_paragraph("名称", center),
-        make_paragraph("编码", center),
-        make_paragraph("代号", center),
-        make_paragraph("数量", center),
+        make_paragraph(label("增减配置", "Addition / deduction", lang), center),
+        make_paragraph(label("部件", "Component", lang), center),
+        make_paragraph(label("名称", "Name", lang), center),
+        make_paragraph(label("编码", "Item No.", lang), center),
+        make_paragraph(label("代号", "Code", lang), center),
+        make_paragraph(label("数量", "Qty", lang), center),
     ]]
     expanded_items = []
     for item in quote.selected_option_items or []:
@@ -2789,7 +2957,14 @@ class QuotationApp:
         safe_form = re.sub(r"[^0-9A-Za-z._()-]+", "_", self.form_var.get())
         output = categorized_output_path("配置清单", f"{title}_{safe_model}_{safe_form}_{date.today().isoformat()}.xlsx")
         try:
-            output = make_config_list_excel(self.db, self.model_var.get(), self.form_var.get(), list_type, output)
+            output = make_config_list_excel(
+                self.db,
+                self.model_var.get(),
+                self.form_var.get(),
+                list_type,
+                output,
+                lang=LANG_OPTIONS.get(self.language_label.get(), "zh"),
+            )
             self.db = load_database()
             messagebox.showinfo("生成完成", f"已生成:\n{output}")
             open_containing_folder(output)
@@ -2808,7 +2983,12 @@ class QuotationApp:
         suffix_text = f"_{version_suffix}" if version_suffix else ""
         output = categorized_output_path("配置及增减配清单", f"{safe_model}配置及增减配清单{suffix_text}.xlsx")
         try:
-            output = make_combined_config_option_excel(self.db, self.model_var.get(), output)
+            output = make_combined_config_option_excel(
+                self.db,
+                self.model_var.get(),
+                output,
+                lang=LANG_OPTIONS.get(self.language_label.get(), "zh"),
+            )
             messagebox.showinfo("生成完成", f"已生成:\n{output}")
             open_containing_folder(output)
         except Exception as exc:
