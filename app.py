@@ -81,6 +81,7 @@ LANG_OPTIONS = {"中文": "zh", "English": "en", "Français": "fr", "Deutsch": "
 TRANSLATIONS = {
     "中联塔机报价单": {"en": "TOWER CRANE QUOTATION", "fr": "DEVIS POUR GRUE A TOUR", "de": "ANGEBOT FUER TURMDREHKRAN"},
     "报价日期": {"en": "Date", "fr": "Date", "de": "Datum"},
+    "客户名称": {"en": "Customer", "fr": "Client", "de": "Kunde"},
     "报价单位": {"en": "Quotation unit", "fr": "Unite emettrice", "de": "Angebotseinheit"},
     "报价人": {"en": "Quoted by", "fr": "Emetteur", "de": "Ansprechpartner"},
     "联系电话": {"en": "Phone", "fr": "Telephone", "de": "Telefon"},
@@ -275,6 +276,7 @@ def append_change_log(operator_id, operation_time, content):
 def default_user_settings():
     return {
         "header_address": "Zoomlion Smart City Headquarters Building, No.613 NaqiuRoad, WangCheng District, Changsha, Hunan, China",
+        "customer_name": "",
         "quote_company": "中联重科建筑起重机械有限公司",
         "quote_person": "Lewis",
         "quote_phone": "+86 123456789",
@@ -1575,6 +1577,7 @@ class QuoteInput:
     price: str
     currency: str
     header_address: str
+    customer_name: str
     quote_company: str
     quote_person: str
     quote_phone: str
@@ -1650,6 +1653,12 @@ def make_pdf(db, quote, output_path):
     story.append(header)
 
     quote_info_rows = [
+        [
+            make_paragraph(label("客户名称", "Customer", lang), center),
+            make_paragraph(tr_text(quote.customer_name, lang), left),
+            make_paragraph(label("报价日期", "Date", lang), center),
+            make_paragraph(quote.quote_date, left),
+        ],
         [
             make_paragraph(label("报价单位", "Quotation unit", lang), center),
             make_paragraph(tr_text(quote.quote_company, lang), left),
@@ -1871,6 +1880,7 @@ class QuotationApp:
         self.price = StringVar(value="")
         self.currency = StringVar(value="CNY")
         self.header_address = StringVar(value=self.user_settings["header_address"])
+        self.customer_name = StringVar(value=self.user_settings["customer_name"])
         self.quote_company = StringVar(value=self.user_settings["quote_company"])
         self.quote_person = StringVar(value=self.user_settings["quote_person"])
         self.quote_phone = StringVar(value=self.user_settings["quote_phone"])
@@ -2069,14 +2079,15 @@ class QuotationApp:
             ("价格", ttk.Entry(quote_info, textvariable=self.price, width=14), 1, 0),
             ("价格单位", self.currency_combo, 1, 2),
             ("报价单位", ttk.Entry(quote_info, textvariable=self.quote_company, width=38), 1, 4),
-            ("报价人", ttk.Entry(quote_info, textvariable=self.quote_person, width=14), 2, 0),
-            ("联系电话", ttk.Entry(quote_info, textvariable=self.quote_phone, width=18), 2, 2),
-            ("联系邮箱", ttk.Entry(quote_info, textvariable=self.quote_email, width=30), 3, 0),
-            ("公司地址", ttk.Entry(quote_info, textvariable=self.header_address, width=64), 4, 0),
+            ("客户名称", ttk.Entry(quote_info, textvariable=self.customer_name, width=38), 2, 0),
+            ("报价人", ttk.Entry(quote_info, textvariable=self.quote_person, width=14), 3, 0),
+            ("联系电话", ttk.Entry(quote_info, textvariable=self.quote_phone, width=18), 3, 2),
+            ("联系邮箱", ttk.Entry(quote_info, textvariable=self.quote_email, width=30), 4, 0),
+            ("公司地址", ttk.Entry(quote_info, textvariable=self.header_address, width=64), 5, 0),
         ]
         for label_text, widget, row, col in quote_fields:
             ttk.Label(quote_info, text=label_text).grid(row=row, column=col, sticky="w", padx=(0, 4), pady=3)
-            span = 7 if label_text in ("公司地址", "联系邮箱") else (3 if label_text == "报价单位" else 1)
+            span = 7 if label_text in ("公司地址", "联系邮箱", "客户名称") else (3 if label_text == "报价单位" else 1)
             widget.grid(row=row, column=col + 1, columnspan=span, sticky="we", padx=(0, 10), pady=3)
         quote_info.columnconfigure(7, weight=1)
 
@@ -2700,6 +2711,7 @@ class QuotationApp:
         save_user_settings(
             {
                 "header_address": self.header_address.get(),
+                "customer_name": self.customer_name.get(),
                 "quote_company": self.quote_company.get(),
                 "quote_person": self.quote_person.get(),
                 "quote_phone": self.quote_phone.get(),
@@ -2727,6 +2739,7 @@ class QuotationApp:
             price=self.price.get(),
             currency=self.currency.get(),
             header_address=self.header_address.get(),
+            customer_name=self.customer_name.get(),
             quote_company=self.quote_company.get(),
             quote_person=self.quote_person.get(),
             quote_phone=self.quote_phone.get(),
