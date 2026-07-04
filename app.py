@@ -2456,7 +2456,7 @@ class QuotationApp:
 
         table_frame = ttk.Frame(wrapper)
         table_frame.pack(fill=BOTH, expand=True)
-        columns = ("seq", "component", "name", "code", "model_code", "mark", "price")
+        columns = ("seq", "component", "name", "code", "model_code", "mark")
         tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
         headings = {
             "seq": "序号",
@@ -2465,9 +2465,8 @@ class QuotationApp:
             "code": "编码",
             "model_code": "代号",
             "mark": "配置标记",
-            "price": "价格",
         }
-        widths = {"seq": 55, "component": 110, "name": 170, "code": 170, "model_code": 150, "mark": 75, "price": 90}
+        widths = {"seq": 55, "component": 130, "name": 210, "code": 190, "model_code": 170, "mark": 90}
         for column in columns:
             tree.heading(column, text=headings[column])
             tree.column(column, width=widths[column], anchor="w")
@@ -2482,7 +2481,6 @@ class QuotationApp:
                     child.get("code", ""),
                     code_or_slash(child.get("model_code", "")),
                     child.get("mark", ""),
-                    child.get("price", ""),
                 ),
             )
 
@@ -2595,7 +2593,7 @@ class QuotationApp:
             if password_var.get() != "zlzk.123456789" and not is_admin_login:
                 messagebox.showerror("密码错误", "密码不正确，无法进入研发配置导入模块。", parent=password_window)
                 return
-            self.research_operator_id = clean_text(operator_var.get())
+            self.research_operator_id = "00796274" if is_admin_login else clean_text(operator_var.get())
             self.research_operation_time = clean_text(time_var.get())
             password_window.destroy()
             self.show_research_import_window()
