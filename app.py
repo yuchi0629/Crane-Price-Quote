@@ -625,16 +625,42 @@ def import_product_cfg_file(path):
     return count
 
 
-def find_config_form_columns(ws):
+def list_section_bounds(ws, list_type):
+    section_rows = []
+    for row_idx in range(1, ws.max_row + 1):
+        row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
+        compact = re.sub(r"\s+", "", row_text)
+        if not compact:
+            continue
+        if "增减配清单" in compact or ("增减" in compact and "清单" in compact):
+            section_rows.append(("option", row_idx))
+        elif "标准配置清单" in compact or ("配置清单" in compact and "增减" not in compact):
+            section_rows.append(("basic", row_idx))
+    if not section_rows:
+        return 1, ws.max_row
+
+    wanted = "option" if list_type == "option" else "basic"
+    matching = [item for item in section_rows if item[0] == wanted]
+    if not matching:
+        return 1, ws.max_row
+    start_row = matching[0][1]
+    following = [row for _kind, row in section_rows if row > start_row]
+    end_row = min(following) - 1 if following else ws.max_row
+    return start_row, end_row
+
+
+def find_config_form_columns(ws, start_row=1, end_row=None):
+    end_row = end_row or ws.max_row
     form_row = None
-    for row_idx in range(1, min(ws.max_row, 12) + 1):
+    scan_end = min(end_row, start_row + 14)
+    for row_idx in range(start_row, scan_end + 1):
         values = [clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1)]
         row_text = " ".join(values)
         if "标配" in row_text and "选配" in row_text and "不配" in row_text:
             form_row = row_idx + 1
             break
     form_tokens = ["固定式", "附着", "内爬", "行走", "压重"]
-    for row_idx in range(1, min(ws.max_row, 12) + 1):
+    for row_idx in range(start_row, scan_end + 1):
         if form_row:
             break
         values = [clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1)]
@@ -649,7 +675,7 @@ def find_config_form_columns(ws):
         if len(form_columns) == 1 and form_columns[0] > 1:
             form_row = row_idx
     if not form_row:
-        return 4, {}
+        return start_row + 3, {}
 
     columns = {}
     for col in range(1, ws.max_column + 1):
@@ -736,21 +762,22 @@ def open_containing_folder(path):
         os.startfile(folder)
 
 
-def column_header_text(ws, col, form_row):
-    values = [clean_text(ws.cell(row, col).value) for row in range(1, form_row + 1)]
+def column_header_text(ws, col, form_row, start_row=1):
+    values = [clean_text(ws.cell(row, col).value) for row in range(start_row, form_row + 1)]
     return " ".join(value for value in values if value)
 
 
-def export_column_indexes(ws, form_row, form_col, all_form_cols):
+def export_column_indexes(ws, form_row, form_col, all_form_cols, start_row=1, end_row=None):
+    end_row = end_row or ws.max_row
     columns = []
     for col in range(1, ws.max_column + 1):
-        header_text = column_header_text(ws, col, form_row)
+        header_text = column_header_text(ws, col, form_row, start_row)
         normalized_header = re.sub(r"\s+", "", header_text)
         if any(keyword in normalized_header for keyword in EXPORT_DROP_KEYWORDS):
             continue
         if col in all_form_cols and col != form_col:
             continue
-        if not header_text and not any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(form_row + 1, ws.max_row + 1)):
+        if not header_text and not any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(form_row + 1, end_row + 1)):
             continue
         columns.append(col)
     return columns
@@ -770,9 +797,9 @@ def cell_value_with_merge(ws, row_idx, col_idx):
     return ""
 
 
-def find_header_column(ws, form_row, keywords):
+def find_header_column(ws, form_row, keywords, start_row=1):
     for col in range(1, ws.max_column + 1):
-        header_text = re.sub(r"\s+", "", column_header_text(ws, col, form_row))
+        header_text = re.sub(r"\s+", "", column_header_text(ws, col, form_row, start_row))
         if any(keyword in header_text for keyword in keywords):
             return col
     return None
@@ -819,19 +846,20 @@ def config_rows_for_form(db, model_name, install_form, list_type="basic"):
 
     wb = load_workbook(BytesIO(workbook_bytes), data_only=True)
     ws = worksheet_for_list_type(wb, list_type)
-    form_row, form_columns = find_config_form_columns(ws)
+    section_start, section_end = list_section_bounds(ws, list_type)
+    form_row, form_columns = find_config_form_columns(ws, section_start, section_end)
     form_col = matched_form_column(form_columns, install_form)
     if not form_col:
         raise ValueError("当前安装形式没有匹配到配置表列。")
 
-    comp_col = find_header_column(ws, form_row, ["组成"])
-    part_col = find_header_column(ws, form_row, ["部件"])
-    name_col = find_header_column(ws, form_row, ["名称"])
-    code_col = find_header_column(ws, form_row, ["编码"])
-    model_code_col = find_header_column(ws, form_row, ["代号"])
-    price_col = find_header_column(ws, form_row, ["价格", "基价"])
+    comp_col = find_header_column(ws, form_row, ["组成"], section_start)
+    part_col = find_header_column(ws, form_row, ["部件"], section_start)
+    name_col = find_header_column(ws, form_row, ["名称"], section_start)
+    code_col = find_header_column(ws, form_row, ["编码"], section_start)
+    model_code_col = find_header_column(ws, form_row, ["代号"], section_start)
+    price_col = find_header_column(ws, form_row, ["价格", "基价"], section_start)
     rows = []
-    for row_idx in range(form_row + 1, ws.max_row + 1):
+    for row_idx in range(form_row + 1, section_end + 1):
         full_row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
         if not full_row_text:
             continue
@@ -926,18 +954,19 @@ def export_merge_ranges(ws, source_rows, columns):
     return ranges
 
 
-def build_config_export_rows(ws, form_row, form_columns):
+def build_config_export_rows(ws, form_row, form_columns, start_row=1, end_row=None):
+    end_row = end_row or ws.max_row
     all_form_cols = set(form_columns.values())
     export_forms = {}
     for form_key, form_col in form_columns.items():
-        columns = export_column_indexes(ws, form_row, form_col, all_form_cols)
+        columns = export_column_indexes(ws, form_row, form_col, all_form_cols, start_row, end_row)
         form_export_col = columns.index(form_col) if form_col in columns else None
-        header_rows = [row_values(ws, row_idx, columns) for row_idx in range(1, form_row + 1)]
+        header_rows = [row_values(ws, row_idx, columns) for row_idx in range(start_row, form_row + 1)]
         basic_rows = []
-        basic_source_rows = list(range(1, form_row + 1))
+        basic_source_rows = list(range(start_row, form_row + 1))
         option_rows = []
-        option_source_rows = list(range(1, form_row + 1))
-        for row_idx in range(form_row + 1, ws.max_row + 1):
+        option_source_rows = list(range(start_row, form_row + 1))
+        for row_idx in range(form_row + 1, end_row + 1):
             full_row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
             if not full_row_text:
                 continue
@@ -966,16 +995,31 @@ def build_config_export_rows(ws, form_row, form_columns):
 def import_tower_config_file(path, model_name=None):
     workbook_bytes = Path(path).read_bytes()
     wb = load_workbook(path, data_only=True)
-    ws = wb.active
+    ws = worksheet_for_list_type(wb, "basic")
     model_name = clean_text(model_name) or Path(path).stem.replace("（", "(").replace("）", ")")
 
-    form_row, form_columns = find_config_form_columns(ws)
+    basic_start, basic_end = list_section_bounds(ws, "basic")
+    form_row, form_columns = find_config_form_columns(ws, basic_start, basic_end)
     components_by_form = {form: [] for form in form_columns}
-    export_forms = build_config_export_rows(ws, form_row, form_columns)
-    name_col = find_header_column(ws, form_row, ["名称"])
-    model_code_col = find_header_column(ws, form_row, ["代号"])
+    export_forms = build_config_export_rows(ws, form_row, form_columns, basic_start, basic_end)
 
-    for row_idx in range(form_row + 1, ws.max_row + 1):
+    option_ws = worksheet_for_list_type(wb, "option")
+    option_start, option_end = list_section_bounds(option_ws, "option")
+    option_form_row, option_form_columns = find_config_form_columns(option_ws, option_start, option_end)
+    if option_form_columns:
+        option_export_forms = build_config_export_rows(option_ws, option_form_row, option_form_columns, option_start, option_end)
+        for form_key, option_data in option_export_forms.items():
+            target = export_forms.setdefault(form_key, {})
+            target.setdefault("headers", option_data.get("headers", []))
+            target.setdefault("basic_rows", [])
+            target.setdefault("basic_merges", [])
+            target["option_rows"] = option_data.get("option_rows", [])
+            target["option_merges"] = option_data.get("option_merges", [])
+
+    name_col = find_header_column(ws, form_row, ["名称"], basic_start)
+    model_code_col = find_header_column(ws, form_row, ["代号"], basic_start)
+
+    for row_idx in range(form_row + 1, basic_end + 1):
         source_values = [ws.cell(row_idx, col).value for col in range(1, ws.max_column + 1)]
         row_text = " ".join(clean_text(value) for value in source_values)
         if should_skip_component(row_text):
@@ -1458,25 +1502,26 @@ def infer_model_from_config_filename(path, products):
     return ""
 
 
-def export_all_form_column_indexes(ws, form_row, form_columns, drop_price_only=False):
+def export_all_form_column_indexes(ws, form_row, form_columns, drop_price_only=False, start_row=1, end_row=None):
+    end_row = end_row or ws.max_row
     columns = []
     component_col = None
     name_col = None
     for col in range(1, ws.max_column + 1):
-        normalized_header = re.sub(r"\s+", "", column_header_text(ws, col, form_row))
+        normalized_header = re.sub(r"\s+", "", column_header_text(ws, col, form_row, start_row))
         if normalized_header == "部件":
             component_col = col
         elif normalized_header == "名称":
             name_col = col
     for col in range(1, ws.max_column + 1):
-        header_text = column_header_text(ws, col, form_row)
+        header_text = column_header_text(ws, col, form_row, start_row)
         normalized_header = re.sub(r"\s+", "", header_text)
         if not drop_price_only and component_col and name_col and col == component_col:
             continue
         drop_keywords = ["编码", "价格", "基价"] if drop_price_only else [keyword for keyword in EXPORT_DROP_KEYWORDS if keyword != "序号"]
         if any(keyword in normalized_header for keyword in drop_keywords):
             continue
-        has_data = any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(1, ws.max_row + 1))
+        has_data = any(clean_text(ws.cell(row_idx, col).value) for row_idx in range(start_row, end_row + 1))
         if header_text or has_data or col in form_columns.values():
             columns.append(col)
     return columns
@@ -1532,9 +1577,10 @@ def config_list_title(source_title, model_name, list_type):
     return text or f"{model_name}塔机选配配置表"
 
 
-def selected_config_source_rows(ws, form_row, form_columns, list_type):
-    source_rows = list(range(1, form_row + 1))
-    for row_idx in range(form_row + 1, ws.max_row + 1):
+def selected_config_source_rows(ws, form_row, form_columns, list_type, start_row=1, end_row=None):
+    end_row = end_row or ws.max_row
+    source_rows = list(range(start_row, form_row + 1))
+    for row_idx in range(form_row + 1, end_row + 1):
         full_row_text = " ".join(clean_text(ws.cell(row_idx, col).value) for col in range(1, ws.max_column + 1))
         if not full_row_text:
             continue
@@ -1554,7 +1600,7 @@ def copy_config_sheet(source_ws, target_ws, source_rows, source_columns, form_ro
     col_map = {source_col: target_col for target_col, source_col in enumerate(source_columns, start=1)}
     sequence_col = None
     for col in source_columns:
-        if "序号" in column_header_text(source_ws, col, form_row):
+        if "序号" in column_header_text(source_ws, col, form_row, source_rows[0] if source_rows else 1):
             sequence_col = col
             break
 
@@ -1629,16 +1675,19 @@ def make_combined_config_option_excel(db, model_name, output_path, lang="zh"):
     source_wb = load_workbook(BytesIO(workbook_bytes))
     basic_source_ws = worksheet_for_list_type(source_wb, "basic")
     option_source_ws = worksheet_for_list_type(source_wb, "option")
-    basic_form_row, basic_form_columns = find_config_form_columns(basic_source_ws)
-    option_form_row, option_form_columns = find_config_form_columns(option_source_ws)
+    basic_start, basic_end = list_section_bounds(basic_source_ws, "basic")
+    option_start, option_end = list_section_bounds(option_source_ws, "option")
+    basic_form_row, basic_form_columns = find_config_form_columns(basic_source_ws, basic_start, basic_end)
+    option_form_row, option_form_columns = find_config_form_columns(option_source_ws, option_start, option_end)
     if not basic_form_columns:
         raise ValueError("配置表中未识别到安装形式列，无法生成清单。")
     if not option_form_columns:
         option_source_ws = basic_source_ws
+        option_start, option_end = basic_start, basic_end
         option_form_row, option_form_columns = basic_form_row, basic_form_columns
 
-    basic_columns = export_all_form_column_indexes(basic_source_ws, basic_form_row, basic_form_columns, drop_price_only=True)
-    option_columns = export_all_form_column_indexes(option_source_ws, option_form_row, option_form_columns, drop_price_only=True)
+    basic_columns = export_all_form_column_indexes(basic_source_ws, basic_form_row, basic_form_columns, drop_price_only=True, start_row=basic_start, end_row=basic_end)
+    option_columns = export_all_form_column_indexes(option_source_ws, option_form_row, option_form_columns, drop_price_only=True, start_row=option_start, end_row=option_end)
     if not basic_columns or not option_columns:
         raise ValueError("配置表中没有可导出的列。")
 
@@ -1647,11 +1696,11 @@ def make_combined_config_option_excel(db, model_name, output_path, lang="zh"):
     basic_ws.title = safe_sheet_title(f"{model_name}{tr_text('配置清单', lang)}")
     option_ws = output_wb.create_sheet(safe_sheet_title(f"{model_name}{tr_text('增减配清单', lang)}"))
 
-    basic_rows = selected_config_source_rows(basic_source_ws, basic_form_row, basic_form_columns, "basic")
-    option_rows = selected_config_source_rows(option_source_ws, option_form_row, option_form_columns, "option")
-    if len(basic_rows) <= basic_form_row:
+    basic_rows = selected_config_source_rows(basic_source_ws, basic_form_row, basic_form_columns, "basic", basic_start, basic_end)
+    option_rows = selected_config_source_rows(option_source_ws, option_form_row, option_form_columns, "option", option_start, option_end)
+    if len(basic_rows) <= (basic_form_row - basic_start + 1):
         raise ValueError("配置表中没有识别到基础配置实心圈项目。")
-    if len(option_rows) <= option_form_row:
+    if len(option_rows) <= (option_form_row - option_start + 1):
         raise ValueError("配置表中没有识别到增减配项目。")
 
     copy_config_sheet(
