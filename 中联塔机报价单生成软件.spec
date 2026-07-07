@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='中联塔机配置清单及报价表软件',
+    name='中联塔机配置确认及报价单生成软件 V1.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

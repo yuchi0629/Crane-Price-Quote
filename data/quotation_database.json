@@ -9200,8 +9200,1441 @@
       }
     ]
   },
-  "components_by_model": {},
-  "config_exports_by_model": {},
+  "components_by_model": {
+    "R220-10RA(CE)": {
+      "model": "R220-10RA(CE)",
+      "model_key": "R220-10RA(CE)",
+      "source_file": "R220-10RA(CE) - 改.xlsx",
+      "workbook_base64": "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",
+      "forms": {
+        "支腿固定式": [
+          {
+            "component_zh": "起重臂",
+            "component_en": "Jib",
+            "part_name": "起重臂",
+            "code": "WA7015-10E(Abroad).05",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "钢丝绳",
+            "component_en": "Wire rope",
+            "part_name": "安全钢丝绳",
+            "code": "10 ZAB 6×19+FC-1570-ZS",
+            "quantity": "65"
+          },
+          {
+            "component_zh": "平衡臂",
+            "component_en": "Counter-jib",
+            "part_name": "平衡臂",
+            "code": "WA7015-10E(Abroad).01A",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "司机室",
+            "component_en": "Cabin",
+            "part_name": "司机室",
+            "code": "CP8-CIFA-W",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "上支座",
+            "component_en": "Upper support",
+            "part_name": "上支座",
+            "code": "R220-10RA(CE).09",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "回转支承",
+            "component_en": "Slewing bearing",
+            "part_name": "回转支承",
+            "code": "QWA1600.50Z3",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "下支座",
+            "component_en": "Lower support",
+            "part_name": "下支座",
+            "code": "R220-10RA(CE).10A",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "吊钩",
+            "component_en": "Hook",
+            "part_name": "吊钩组",
+            "code": "DG10L",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "标准节",
+            "component_en": "Mast section",
+            "part_name": "圆榫标准节",
+            "code": "RA",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "标准节",
+            "component_en": "Mast section",
+            "part_name": "圆榫标准节",
+            "code": "2-RA",
+            "quantity": "7"
+          },
+          {
+            "component_zh": "支腿组件",
+            "component_en": "Support leg assembly",
+            "part_name": "支腿组件",
+            "code": "R165-8RD.15",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "起升机构",
+            "code": "H37FC25-530B(CE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "回转机构",
+            "code": "S55CA-130LA12/14A(CE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "回转机构",
+            "code": "S55CN-130LA12/14A(CE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "变幅机构",
+            "code": "T55FC70-b(DCE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "钢丝绳",
+            "component_en": "Wire rope",
+            "part_name": "起升钢丝绳",
+            "code": "35W×7-14-1870",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "钢丝绳",
+            "component_en": "Wire rope",
+            "part_name": "变幅钢丝绳",
+            "code": "6×19-9.3-1700-Ⅱ-右交",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "电控总成",
+            "component_en": "Electric control assembly",
+            "part_name": "电控总成",
+            "code": "R220-10(CE)",
+            "quantity": "1"
+          }
+        ],
+        "底架固定式": [
+          {
+            "component_zh": "起重臂",
+            "component_en": "Jib",
+            "part_name": "起重臂",
+            "code": "WA7015-10E(Abroad).05",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "钢丝绳",
+            "component_en": "Wire rope",
+            "part_name": "安全钢丝绳",
+            "code": "10 ZAB 6×19+FC-1570-ZS",
+            "quantity": "65"
+          },
+          {
+            "component_zh": "平衡臂",
+            "component_en": "Counter-jib",
+            "part_name": "平衡臂",
+            "code": "WA7015-10E(Abroad).01A",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "司机室",
+            "component_en": "Cabin",
+            "part_name": "司机室",
+            "code": "CP8-CIFA-W",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "上支座",
+            "component_en": "Upper support",
+            "part_name": "上支座",
+            "code": "R220-10RA(CE).09",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "回转支承",
+            "component_en": "Slewing bearing",
+            "part_name": "回转支承",
+            "code": "QWA1600.50Z3",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "下支座",
+            "component_en": "Lower support",
+            "part_name": "下支座",
+            "code": "R220-10RA(CE).10A",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "吊钩",
+            "component_en": "Hook",
+            "part_name": "吊钩组",
+            "code": "DG10L",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "标准节",
+            "component_en": "Mast section",
+            "part_name": "圆榫标准节",
+            "code": "RA",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "标准节",
+            "component_en": "Mast section",
+            "part_name": "圆榫标准节",
+            "code": "2-RA",
+            "quantity": "7"
+          },
+          {
+            "component_zh": "底架",
+            "component_en": "Base frame",
+            "part_name": "4.5m城市底架",
+            "code": "DJ-45B",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "起升机构",
+            "code": "H37FC25-530B(CE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "回转机构",
+            "code": "S55CA-130LA12/14A(CE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "回转机构",
+            "code": "S55CN-130LA12/14A(CE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "机构",
+            "component_en": "Mechanism",
+            "part_name": "变幅机构",
+            "code": "T55FC70-b(DCE)",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "钢丝绳",
+            "component_en": "Wire rope",
+            "part_name": "起升钢丝绳",
+            "code": "35W×7-14-1870",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "钢丝绳",
+            "component_en": "Wire rope",
+            "part_name": "变幅钢丝绳",
+            "code": "6×19-9.3-1700-Ⅱ-右交",
+            "quantity": "1"
+          },
+          {
+            "component_zh": "电控总成",
+            "component_en": "Electric control assembly",
+            "part_name": "电控总成",
+            "code": "R220-10(CE)",
+            "quantity": "1"
+          }
+        ]
+      }
+    }
+  },
+  "config_exports_by_model": {
+    "R220-10RA(CE)": {
+      "model": "R220-10RA(CE)",
+      "model_key": "R220-10RA(CE)",
+      "source_file": "R220-10RA(CE) - 改.xlsx",
+      "workbook_base64": "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",
+      "export_schema_version": 3,
+      "forms": {
+        "支腿固定式": {
+          "headers": [
+            [
+              "",
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              "",
+              ""
+            ],
+            [
+              "组成",
+              "名称",
+              "代号",
+              "“●”标配  “○”选配  “-”不配"
+            ],
+            [
+              "",
+              "",
+              "",
+              "支腿\n固定式"
+            ]
+          ],
+          "basic_rows": [
+            [
+              "上装总成",
+              "起重臂",
+              "WA7015-10E(Abroad).05",
+              "●"
+            ],
+            [
+              "",
+              "安全钢丝绳",
+              "10 ZAB 6×19+FC-1570-ZS",
+              "●×65"
+            ],
+            [
+              "",
+              "绳夹",
+              "10KTH",
+              "●×6"
+            ],
+            [
+              "",
+              "平衡臂",
+              "WA7015-10E(Abroad).01A",
+              "●"
+            ],
+            [
+              "",
+              "信号接收器安装座",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "回转制动器显示灯安装座",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "三色灯安装座",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "司机室",
+              "CP8-CIFA-W",
+              "●"
+            ],
+            [
+              "",
+              "上支座",
+              "R220-10RA(CE).09",
+              "●"
+            ],
+            [
+              "",
+              "回转支承",
+              "QWA1600.50Z3",
+              "●"
+            ],
+            [
+              "",
+              "下支座",
+              "R220-10RA(CE).10A",
+              "●"
+            ],
+            [
+              "",
+              "载重小车",
+              "XC10E",
+              "●"
+            ],
+            [
+              "",
+              "吊钩组",
+              "DG10L",
+              "●"
+            ],
+            [
+              "塔身\n总成",
+              "圆榫标准节",
+              "RA",
+              "●"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "2-RA",
+              "●×7"
+            ],
+            [
+              "",
+              "圆榫基础节",
+              "RAJZ2",
+              "●"
+            ],
+            [
+              "",
+              "RA外挂式平台",
+              "",
+              "●"
+            ],
+            [
+              "",
+              "支腿组件",
+              "R165-8RD.15",
+              "●"
+            ],
+            [
+              "安全\n装置",
+              "开关安装盒",
+              "LJ-D2(2K)CE-K-6",
+              "●"
+            ],
+            [
+              "",
+              "起重量传感器总成(含线缆)",
+              "R165-10(CE)-TWL-XZ",
+              "●"
+            ],
+            [
+              "",
+              "起重量限制器拉环",
+              "TWL-2K",
+              "●"
+            ],
+            [
+              "",
+              "回转限位装置",
+              "",
+              "●"
+            ],
+            [
+              "",
+              "起升绝对值编码器",
+              "EAM580-SC0.5NC6.14180.A-GH1",
+              "●"
+            ],
+            [
+              "",
+              "回转绝对值编码器",
+              "EAM580-SC0.5NC6.14180.A-GS1",
+              "●"
+            ],
+            [
+              "",
+              "变幅绝对值编码器",
+              "EAM580-SC0.5NC6.14180.A-GV1",
+              "●"
+            ],
+            [
+              "标牌",
+              "起重特性牌",
+              "R220-10RA(CE)-TX",
+              "●×2"
+            ],
+            [
+              "",
+              "CE铭牌",
+              "R220-10RA(CE)-TXMP",
+              "●"
+            ],
+            [
+              "",
+              "CE铭牌安装架",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "幅度指示牌",
+              "W6522-10S(CE)-TSP",
+              "●"
+            ],
+            [
+              "",
+              "司机安全操作规程牌",
+              "TC-CZGC",
+              "●"
+            ],
+            [
+              "机构及钢丝绳",
+              "起升机构",
+              "H37FC25-530B(CE)",
+              "●"
+            ],
+            [
+              "",
+              "回转机构",
+              "S55CA-130LA12/14A(CE)",
+              "●"
+            ],
+            [
+              "",
+              "回转机构",
+              "S55CN-130LA12/14A(CE)",
+              "●"
+            ],
+            [
+              "",
+              "变幅机构",
+              "T55FC70-b(DCE)",
+              "●"
+            ],
+            [
+              "",
+              "起升钢丝绳",
+              "35W×7-14-1870",
+              "●"
+            ],
+            [
+              "",
+              "变幅钢丝绳",
+              "6×19-9.3-1700-Ⅱ-右交",
+              "●"
+            ],
+            [
+              "电控系统",
+              "电控总成",
+              "R220-10(CE)",
+              "●"
+            ],
+            [
+              "",
+              "起升机构带插头电缆包",
+              "R220-10-LH01",
+              "●"
+            ],
+            [
+              "",
+              "变幅机构带插头电缆包",
+              "R220-10-LV01",
+              "●"
+            ],
+            [
+              "",
+              "回转机构带插头电缆包",
+              "R220-10-LS01",
+              "●"
+            ],
+            [
+              "",
+              "无线遥控附件包",
+              "ATC-CE",
+              "●"
+            ],
+            [
+              "",
+              "电源箱总成",
+              "PSB-CE",
+              "●"
+            ],
+            [
+              "",
+              "风速仪",
+              "YF200-A",
+              "●"
+            ],
+            [
+              "",
+              "风速仪电缆",
+              "YFXS-7m",
+              "●"
+            ],
+            [
+              "",
+              "电阻器",
+              "RTH45S5V1-111-SS",
+              "●"
+            ],
+            [
+              "",
+              "主电缆",
+              "H07RN-F 4G35",
+              "●×54"
+            ]
+          ],
+          "option_rows": [
+            [
+              "选配",
+              "平衡重",
+              "W6522-10(CE)-PHZ",
+              "○"
+            ],
+            [
+              "",
+              "4.5m城市底架压重",
+              "DJ-4.5m压重",
+              "○"
+            ],
+            [
+              "",
+              "平衡重框",
+              "W6522-10(CE)-PHZK",
+              "○"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "RA",
+              "○"
+            ],
+            [
+              "",
+              "防碰撞系统",
+              "TGAC_W",
+              "○"
+            ],
+            [
+              "",
+              "1.5P有氟分体式空调",
+              "T-AC(CE)",
+              "○"
+            ],
+            [
+              "",
+              "预埋支腿定位框",
+              "DWK/R6017-10RA",
+              "○"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "RA",
+              "○"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "2-RA",
+              "○"
+            ],
+            [
+              "",
+              "圆榫基础节",
+              "RAJZ2",
+              "○"
+            ],
+            [
+              "",
+              "RA支腿座",
+              "",
+              "○"
+            ],
+            [
+              "",
+              "4.5m城市底架",
+              "DJ-45B",
+              "○"
+            ],
+            [
+              "",
+              "支腿组件",
+              "R165-8RD.15",
+              "○"
+            ],
+            [
+              "",
+              "Autec无线遥控器",
+              "KAJC0770L0-00",
+              "○"
+            ],
+            [
+              "爬升\n部件包",
+              "爬升架",
+              "R165-10RA.11",
+              "○"
+            ],
+            [
+              "",
+              "顶升机构",
+              "R165-10RA.12",
+              "○"
+            ],
+            [
+              "",
+              "顶升油缸",
+              "YG180/135-1950/2470-31.5",
+              "○"
+            ],
+            [
+              "",
+              "泵站",
+              "BZ11-31.5R",
+              "○"
+            ],
+            [
+              "",
+              "胶管总成",
+              "F02WA0A0181806-4000",
+              "○"
+            ],
+            [
+              "",
+              "胶管总成",
+              "F02WA0A0181806-3000",
+              "○"
+            ],
+            [
+              "",
+              "过渡节",
+              "R165Rg",
+              "○"
+            ],
+            [
+              "",
+              "引进系统",
+              "WA6515-10YA.19",
+              "○"
+            ],
+            [
+              "",
+              "安装平台",
+              "WA6515-10YA.20",
+              "○"
+            ],
+            [
+              "中央集电环配套物资",
+              "中央集电环",
+              "XC050-4-250-CUL-CE(V-0027)",
+              "○"
+            ],
+            [
+              "",
+              "W45回转绝对值编码器电缆",
+              "/",
+              "○"
+            ],
+            [
+              "",
+              "圆榫非标节",
+              "RA-3半节",
+              "○"
+            ],
+            [
+              "",
+              "圆榫非标节",
+              "RA-2半节",
+              "○"
+            ],
+            [
+              "电动扒杆包",
+              "1T电动扒杆",
+              "EBG1000(400V/50Hz)",
+              "○"
+            ],
+            [
+              "",
+              "电动扒杆电控系统",
+              "/",
+              "○"
+            ]
+          ],
+          "basic_merges": [
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 41,
+              "max_row": 50,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 35,
+              "max_row": 40,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 23,
+              "max_row": 29,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 30,
+              "max_row": 34,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 5,
+              "max_row": 17,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 2,
+              "max_col": 2
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 3,
+              "max_col": 3
+            }
+          ],
+          "option_merges": [
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 3,
+              "max_col": 3
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 5,
+              "max_row": 18,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 2,
+              "max_col": 2
+            },
+            {
+              "min_row": 19,
+              "max_row": 27,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 32,
+              "max_row": 33,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 28,
+              "max_row": 31,
+              "min_col": 1,
+              "max_col": 1
+            }
+          ]
+        },
+        "底架固定式": {
+          "headers": [
+            [
+              "",
+              "",
+              "",
+              ""
+            ],
+            [
+              "",
+              "",
+              "",
+              ""
+            ],
+            [
+              "组成",
+              "名称",
+              "代号",
+              ""
+            ],
+            [
+              "",
+              "",
+              "",
+              "底架\n固定式"
+            ]
+          ],
+          "basic_rows": [
+            [
+              "上装总成",
+              "起重臂",
+              "WA7015-10E(Abroad).05",
+              "●"
+            ],
+            [
+              "",
+              "安全钢丝绳",
+              "10 ZAB 6×19+FC-1570-ZS",
+              "●×65"
+            ],
+            [
+              "",
+              "绳夹",
+              "10KTH",
+              "●×6"
+            ],
+            [
+              "",
+              "平衡臂",
+              "WA7015-10E(Abroad).01A",
+              "●"
+            ],
+            [
+              "",
+              "信号接收器安装座",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "回转制动器显示灯安装座",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "三色灯安装座",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "司机室",
+              "CP8-CIFA-W",
+              "●"
+            ],
+            [
+              "",
+              "上支座",
+              "R220-10RA(CE).09",
+              "●"
+            ],
+            [
+              "",
+              "回转支承",
+              "QWA1600.50Z3",
+              "●"
+            ],
+            [
+              "",
+              "下支座",
+              "R220-10RA(CE).10A",
+              "●"
+            ],
+            [
+              "",
+              "载重小车",
+              "XC10E",
+              "●"
+            ],
+            [
+              "",
+              "吊钩组",
+              "DG10L",
+              "●"
+            ],
+            [
+              "塔身\n总成",
+              "圆榫标准节",
+              "RA",
+              "●"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "2-RA",
+              "●×7"
+            ],
+            [
+              "",
+              "圆榫基础节",
+              "RAJZ2",
+              "●"
+            ],
+            [
+              "",
+              "RA外挂式平台",
+              "",
+              "●"
+            ],
+            [
+              "",
+              "RA支腿座",
+              "",
+              "●×4"
+            ],
+            [
+              "",
+              "4.5m城市底架",
+              "DJ-45B",
+              "●"
+            ],
+            [
+              "安全\n装置",
+              "开关安装盒",
+              "LJ-D2(2K)CE-K-6",
+              "●"
+            ],
+            [
+              "",
+              "起重量传感器总成(含线缆)",
+              "R165-10(CE)-TWL-XZ",
+              "●"
+            ],
+            [
+              "",
+              "起重量限制器拉环",
+              "TWL-2K",
+              "●"
+            ],
+            [
+              "",
+              "回转限位装置",
+              "",
+              "●"
+            ],
+            [
+              "",
+              "起升绝对值编码器",
+              "EAM580-SC0.5NC6.14180.A-GH1",
+              "●"
+            ],
+            [
+              "",
+              "回转绝对值编码器",
+              "EAM580-SC0.5NC6.14180.A-GS1",
+              "●"
+            ],
+            [
+              "",
+              "变幅绝对值编码器",
+              "EAM580-SC0.5NC6.14180.A-GV1",
+              "●"
+            ],
+            [
+              "标牌",
+              "起重特性牌",
+              "R220-10RA(CE)-TX",
+              "●×2"
+            ],
+            [
+              "",
+              "CE铭牌",
+              "R220-10RA(CE)-TXMP",
+              "●"
+            ],
+            [
+              "",
+              "CE铭牌安装架",
+              "/",
+              "●"
+            ],
+            [
+              "",
+              "幅度指示牌",
+              "W6522-10S(CE)-TSP",
+              "●"
+            ],
+            [
+              "",
+              "司机安全操作规程牌",
+              "TC-CZGC",
+              "●"
+            ],
+            [
+              "机构及钢丝绳",
+              "起升机构",
+              "H37FC25-530B(CE)",
+              "●"
+            ],
+            [
+              "",
+              "回转机构",
+              "S55CA-130LA12/14A(CE)",
+              "●"
+            ],
+            [
+              "",
+              "回转机构",
+              "S55CN-130LA12/14A(CE)",
+              "●"
+            ],
+            [
+              "",
+              "变幅机构",
+              "T55FC70-b(DCE)",
+              "●"
+            ],
+            [
+              "",
+              "起升钢丝绳",
+              "35W×7-14-1870",
+              "●"
+            ],
+            [
+              "",
+              "变幅钢丝绳",
+              "6×19-9.3-1700-Ⅱ-右交",
+              "●"
+            ],
+            [
+              "电控系统",
+              "电控总成",
+              "R220-10(CE)",
+              "●"
+            ],
+            [
+              "",
+              "起升机构带插头电缆包",
+              "R220-10-LH01",
+              "●"
+            ],
+            [
+              "",
+              "变幅机构带插头电缆包",
+              "R220-10-LV01",
+              "●"
+            ],
+            [
+              "",
+              "回转机构带插头电缆包",
+              "R220-10-LS01",
+              "●"
+            ],
+            [
+              "",
+              "无线遥控附件包",
+              "ATC-CE",
+              "●"
+            ],
+            [
+              "",
+              "电源箱总成",
+              "PSB-CE",
+              "●"
+            ],
+            [
+              "",
+              "风速仪",
+              "YF200-A",
+              "●"
+            ],
+            [
+              "",
+              "风速仪电缆",
+              "YFXS-7m",
+              "●"
+            ],
+            [
+              "",
+              "电阻器",
+              "RTH45S5V1-111-SS",
+              "●"
+            ],
+            [
+              "",
+              "主电缆",
+              "H07RN-F 4G35",
+              "●×56"
+            ]
+          ],
+          "option_rows": [
+            [
+              "选配",
+              "平衡重",
+              "W6522-10(CE)-PHZ",
+              "○"
+            ],
+            [
+              "",
+              "4.5m城市底架压重",
+              "DJ-4.5m压重",
+              "○"
+            ],
+            [
+              "",
+              "平衡重框",
+              "W6522-10(CE)-PHZK",
+              "○"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "RA",
+              "○"
+            ],
+            [
+              "",
+              "防碰撞系统",
+              "TGAC_W",
+              "○"
+            ],
+            [
+              "",
+              "1.5P有氟分体式空调",
+              "T-AC(CE)",
+              "○"
+            ],
+            [
+              "",
+              "预埋支腿定位框",
+              "DWK/R6017-10RA",
+              "○"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "RA",
+              "○"
+            ],
+            [
+              "",
+              "圆榫标准节",
+              "2-RA",
+              "○"
+            ],
+            [
+              "",
+              "圆榫基础节",
+              "RAJZ2",
+              "○"
+            ],
+            [
+              "",
+              "RA支腿座",
+              "",
+              "○"
+            ],
+            [
+              "",
+              "4.5m城市底架",
+              "DJ-45B",
+              "○"
+            ],
+            [
+              "",
+              "支腿组件",
+              "R165-8RD.15",
+              "○"
+            ],
+            [
+              "",
+              "Autec无线遥控器",
+              "KAJC0770L0-00",
+              "○"
+            ],
+            [
+              "爬升\n部件包",
+              "爬升架",
+              "R165-10RA.11",
+              "○"
+            ],
+            [
+              "",
+              "顶升机构",
+              "R165-10RA.12",
+              "○"
+            ],
+            [
+              "",
+              "顶升油缸",
+              "YG180/135-1950/2470-31.5",
+              "○"
+            ],
+            [
+              "",
+              "泵站",
+              "BZ11-31.5R",
+              "○"
+            ],
+            [
+              "",
+              "胶管总成",
+              "F02WA0A0181806-4000",
+              "○"
+            ],
+            [
+              "",
+              "胶管总成",
+              "F02WA0A0181806-3000",
+              "○"
+            ],
+            [
+              "",
+              "过渡节",
+              "R165Rg",
+              "○"
+            ],
+            [
+              "",
+              "引进系统",
+              "WA6515-10YA.19",
+              "○"
+            ],
+            [
+              "",
+              "安装平台",
+              "WA6515-10YA.20",
+              "○"
+            ],
+            [
+              "中央集电环配套物资",
+              "中央集电环",
+              "XC050-4-250-CUL-CE(V-0027)",
+              "○"
+            ],
+            [
+              "",
+              "W45回转绝对值编码器电缆",
+              "/",
+              "○"
+            ],
+            [
+              "",
+              "圆榫非标节",
+              "RA-3半节",
+              "○"
+            ],
+            [
+              "",
+              "圆榫非标节",
+              "RA-2半节",
+              "○"
+            ],
+            [
+              "电动扒杆包",
+              "1T电动扒杆",
+              "EBG1000(400V/50Hz)",
+              "○"
+            ],
+            [
+              "",
+              "电动扒杆电控系统",
+              "/",
+              "○"
+            ]
+          ],
+          "basic_merges": [
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 42,
+              "max_row": 51,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 36,
+              "max_row": 41,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 24,
+              "max_row": 30,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 31,
+              "max_row": 35,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 5,
+              "max_row": 17,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 2,
+              "max_col": 2
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 3,
+              "max_col": 3
+            }
+          ],
+          "option_merges": [
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 3,
+              "max_col": 3
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 5,
+              "max_row": 18,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 3,
+              "max_row": 4,
+              "min_col": 2,
+              "max_col": 2
+            },
+            {
+              "min_row": 19,
+              "max_row": 27,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 32,
+              "max_row": 33,
+              "min_col": 1,
+              "max_col": 1
+            },
+            {
+              "min_row": 28,
+              "max_row": 31,
+              "min_col": 1,
+              "max_col": 1
+            }
+          ]
+        }
+      }
+    }
+  },
   "deleted_config_model_keys": [],
   "options_by_code": {
     "P017337": [

@@ -38,7 +38,7 @@ SETTINGS_FILE = DATA_DIR / "user_settings.json"
 INITIAL_DB_FILE = BUNDLE_DIR / "data" / "quotation_database.json"
 WINDOW_ICON_FILE = BUNDLE_DIR / "assets" / "zoomlion.ico"
 HEADER_ICON_FILE = BUNDLE_DIR / "assets" / "crane.png"
-APP_TITLE = "中联塔机配置清单及报价表软件"
+APP_TITLE = "中联塔机配置确认及报价单生成软件 V1.0"
 CONFIG_DATA_RESET_VERSION = 2
 EMBEDDED_LOGO_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAGwAAAAfCAYAAAAC0CiiAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8"
@@ -211,8 +211,8 @@ TRANSLATIONS = {
         "fr": "ZOOMLION Construction Hoisting Machinery Co., Ltd.",
         "de": "ZOOMLION Construction Hoisting Machinery Co., Ltd.",
     },
-    "中联塔机配置清单及报价表软件": {
-        "en": "ZOOMLION Tower Crane Configuration List and Quotation Software",
+    "中联塔机配置确认及报价单生成软件 V1.0": {
+        "en": "ZOOMLION Tower Crane Configuration Confirmation and Quotation Generator V1.0",
         "fr": "Logiciel de liste de configuration et devis pour grues a tour ZOOMLION",
         "de": "ZOOMLION Software fuer Turmdrehkran-Konfigurationslisten und Angebote",
     },
