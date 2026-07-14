@@ -828,6 +828,8 @@ def find_header_column(ws, form_row, keywords, start_row=1):
 
 
 def workbook_bytes_for_model(db, model_name):
+    if not is_config_published(db, model_name):
+        return None
     for cfg in [find_export_config(db, model_name), find_component_config(db, model_name), find_initial_export_config(model_name)]:
         workbook_base64 = clean_text(cfg.get("workbook_base64", "")) if cfg else ""
         if workbook_base64:
@@ -859,6 +861,8 @@ def matched_form_column(form_columns, install_form):
 
 
 def config_rows_for_form(db, model_name, install_form, list_type="basic"):
+    if not is_config_published(db, model_name):
+        raise ValueError("当前机型配置表尚未发布，不能读取配置表信息。")
     workbook_bytes = workbook_bytes_for_model(db, model_name)
     if not workbook_bytes:
         db, _cfg = ensure_export_config(db, model_name)
@@ -1795,6 +1799,9 @@ def mm_value(value, suffix="m"):
 
 
 def select_components(db, model_name, install_form):
+    if not is_config_published(db, model_name):
+        return []
+
     def visible(items):
         return [
             item
@@ -2846,7 +2853,7 @@ class QuotationApp:
 
         window = Toplevel(self.root)
         window.title("审核并发布")
-        window.geometry("1160x500")
+        window.geometry("1060x500")
         wrapper = ttk.Frame(window, padding=10)
         wrapper.pack(fill=BOTH, expand=True)
 
@@ -2858,7 +2865,7 @@ class QuotationApp:
             foreground="#555",
         ).pack(anchor="w", pady=(0, 8))
 
-        columns = ("model", "code", "config_status", "publish_status", "source", "forms", "components")
+        columns = ("model", "code", "config_status", "publish_status", "source", "forms")
         tree = ttk.Treeview(wrapper, columns=columns, show="headings", height=14)
         headings = {
             "model": "产品型号",
@@ -2867,16 +2874,14 @@ class QuotationApp:
             "publish_status": "发布状态",
             "source": "导入文件",
             "forms": "匹配安装形式",
-            "components": "可见主要部件",
         }
         widths = {
             "model": 170,
             "code": 100,
             "config_status": 100,
             "publish_status": 100,
-            "source": 220,
-            "forms": 230,
-            "components": 110,
+            "source": 260,
+            "forms": 260,
         }
         for col in columns:
             tree.heading(col, text=headings[col])
@@ -2897,7 +2902,15 @@ class QuotationApp:
             imported_count = 0
             published_count = 0
             pending_count = 0
-            for model_name in sorted(products):
+            def status_sort_key(model_name):
+                cfg = cfg_by_key.get(normalize_key(model_name))
+                if cfg and not is_config_published(self.db, model_name):
+                    return (0, model_name)
+                if cfg:
+                    return (1, model_name)
+                return (2, model_name)
+
+            for model_name in sorted(products, key=status_sort_key):
                 product = products[model_name]
                 cfg = cfg_by_key.get(normalize_key(model_name))
                 forms = self.db.get("forms_by_code", {}).get(product.get("product_code", ""), [])
@@ -2909,14 +2922,6 @@ class QuotationApp:
                         for form in forms
                         if normalize_form(form.get("install_form", "")) in cfg_forms
                     ]
-                    visible_count = sum(
-                        len([
-                            item
-                            for item in cfg_forms.get(normalize_form(form.get("install_form", "")), [])
-                            if not should_skip_component(" ".join([item.get("component_zh", ""), item.get("part_name", ""), item.get("code", "")]))
-                        ])
-                        for form in forms
-                    )
                     config_status = "已导入"
                     publish_status = "已发布" if is_config_published(self.db, model_name) else "待发布"
                     if publish_status == "已发布":
@@ -2925,13 +2930,11 @@ class QuotationApp:
                         pending_count += 1
                     source = cfg.get("source_file", "")
                     forms_text = "、".join(matched_forms) if matched_forms else "无匹配安装形式"
-                    components_text = str(visible_count)
                 else:
                     config_status = "未导入"
                     publish_status = "未发布"
                     source = ""
                     forms_text = ""
-                    components_text = "0"
                 tree.insert(
                     "",
                     "end",
@@ -2942,7 +2945,6 @@ class QuotationApp:
                         publish_status,
                         source,
                         forms_text,
-                        components_text,
                     ),
                 )
             summary_var.set(
