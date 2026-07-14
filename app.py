@@ -348,6 +348,7 @@ def default_database():
         "components_by_model": {},
         "config_exports_by_model": {},
         "deleted_config_model_keys": [],
+        "published_config_model_keys": [],
         "options_by_code": {},
         "change_log": [],
         "config_data_reset_version": CONFIG_DATA_RESET_VERSION,
@@ -360,6 +361,7 @@ def apply_database_migrations(db, reset_config_data=False):
         db["components_by_model"] = {}
         db["config_exports_by_model"] = {}
         db["deleted_config_model_keys"] = []
+        db["published_config_model_keys"] = []
         db["config_data_reset_version"] = CONFIG_DATA_RESET_VERSION
         changed = True
     return changed
@@ -705,7 +707,7 @@ def should_skip_component(row_text):
 
 def quantity_from_mark(mark):
     text = clean_text(mark)
-    match = re.search(r"[●]\s*[×xX]\s*(\d+(?:\.\d+)?)", text)
+    match = re.search(r"\u25cf\s*[\u00d7xX]\s*(\d+(?:\.\d+)?)", text)
     if match:
         return match.group(1)
     return "1"
@@ -1069,6 +1071,9 @@ def import_tower_config_file(path, model_name=None):
     db["deleted_config_model_keys"] = [
         key for key in db.get("deleted_config_model_keys", []) if normalize_key(key) != model_key
     ]
+    published_keys = {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
+    published_keys.discard(model_key)
+    db["published_config_model_keys"] = sorted(published_keys)
     old_sources = []
     for key, cfg in list(db["components_by_model"].items()):
         if cfg.get("model_key") == model_key or normalize_key(key) == model_key:
@@ -1118,8 +1123,29 @@ def delete_tower_config(model_name):
         deleted_keys = {normalize_key(key) for key in db.get("deleted_config_model_keys", []) if clean_text(key)}
         deleted_keys.add(model_key)
         db["deleted_config_model_keys"] = sorted(deleted_keys)
+        published_keys = {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
+        published_keys.discard(model_key)
+        db["published_config_model_keys"] = sorted(published_keys)
         save_database(db)
     return sorted(set(removed_sources)), sorted(removed_forms)
+
+
+def is_config_published(db, model_name):
+    model_key = normalize_key(model_name)
+    return model_key in {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
+
+
+def publish_tower_config(model_name):
+    db = load_database()
+    if not has_imported_config(db, model_name):
+        raise ValueError(f"{model_name} 尚未导入配置表，不能发布。")
+    model_key = normalize_key(model_name)
+    published_keys = {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
+    was_pending = model_key not in published_keys
+    published_keys.add(model_key)
+    db["published_config_model_keys"] = sorted(published_keys)
+    save_database(db)
+    return was_pending
 
 
 def register_fonts():
@@ -2175,16 +2201,16 @@ class QuotationApp:
         toolbar = ttk.Frame(main)
         toolbar.pack(fill="x", pady=(10, 8))
         ttk.Button(toolbar, text="配置及增减配清单", command=self.on_generate_combined_config_list).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(toolbar, text="生成报价 PDF", command=self.on_generate).pack(side=LEFT, padx=(0, 8))
         ttk.Button(toolbar, text="报价单信息", command=self.open_quote_info_dialog).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(toolbar, text="生成报价 PDF", command=self.on_generate).pack(side=LEFT, padx=(0, 8))
 
         settings_row = ttk.Frame(main)
         settings_row.pack(fill="x")
         product_select = ttk.LabelFrame(settings_row, text="产品型号选择", padding=10, style="Title.TLabelframe")
         product_select.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
-        info_box = ttk.LabelFrame(settings_row, text="产品基本信息", padding=6, style="Title.TLabelframe")
+        info_box = ttk.LabelFrame(settings_row, text="标准配置信息", padding=6, style="Title.TLabelframe")
         info_box.pack(side=LEFT, fill="both", expand=True, padx=(0, 8))
-        price_box = ttk.LabelFrame(settings_row, text="当前价格", padding=8, style="Title.TLabelframe")
+        price_box = ttk.LabelFrame(settings_row, text="当前FOB参考价格", padding=8, style="Title.TLabelframe")
         price_box.pack(side=LEFT, fill="both")
 
         self.model_combo = ttk.Combobox(product_select, textvariable=self.model_display_var, width=28, state="readonly")
@@ -2265,10 +2291,9 @@ class QuotationApp:
 
         bottom_bar = ttk.Frame(main)
         bottom_bar.pack(side="bottom", fill="x", anchor="w")
-        ttk.Button(bottom_bar, text="研发配置导入模块", command=self.open_research_import_module).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(bottom_bar, text="查看机型配置表导入状态", command=self.show_config_status).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(bottom_bar, text="配置导入修改记录", command=self.show_change_log).pack(side=LEFT, padx=(0, 8))
-        ttk.Button(bottom_bar, text="打开输出文件夹", command=lambda: os.startfile(OUTPUT_DIR)).pack(side=LEFT)
+        ttk.Button(bottom_bar, text="配置及价格导入模块", command=self.open_research_import_module).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(bottom_bar, text="审核并发布", command=self.open_audit_publish_module).pack(side=LEFT, padx=(0, 8))
+        ttk.Button(bottom_bar, text="后台数据变更记录", command=self.show_change_log).pack(side=LEFT, padx=(0, 8))
 
     def term_labels(self):
         return [
@@ -2616,7 +2641,7 @@ class QuotationApp:
                     compact_display_text(item.get("component", "")),
                     item.get("name", ""),
                     code_or_slash(item.get("model_code", "")),
-                    item.get("mark", ""),
+                    quantity_from_mark(item.get("mark", "")),
                 ),
             )
         self.update_current_price()
@@ -2626,8 +2651,14 @@ class QuotationApp:
         self.refresh_models()
 
     def open_research_import_module(self):
+        self.open_protected_module("配置及价格导入模块", self.show_research_import_window)
+
+    def open_audit_publish_module(self):
+        self.open_protected_module("审核并发布", self.show_audit_publish_window)
+
+    def open_protected_module(self, title, on_success):
         password_window = Toplevel(self.root)
-        password_window.title("研发配置导入模块")
+        password_window.title(title)
         password_window.geometry("420x240")
         password_window.transient(self.root)
         password_window.grab_set()
@@ -2639,15 +2670,15 @@ class QuotationApp:
         operator_entry = ttk.Entry(frame, textvariable=operator_var, width=30)
         operator_entry.grid(row=0, column=1, sticky="we", pady=5)
 
-        ttk.Label(frame, text="时间").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=5)
-        time_var = StringVar(value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        time_entry = ttk.Entry(frame, textvariable=time_var, width=30)
-        time_entry.grid(row=1, column=1, sticky="we", pady=5)
-
-        ttk.Label(frame, text="密码").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=5)
+        ttk.Label(frame, text="密码").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=5)
         password_var = StringVar()
         entry = ttk.Entry(frame, textvariable=password_var, show="*", width=28)
-        entry.grid(row=2, column=1, sticky="we", pady=5)
+        entry.grid(row=1, column=1, sticky="we", pady=5)
+
+        ttk.Label(frame, text="时间").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=5)
+        time_var = StringVar(value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        time_entry = ttk.Entry(frame, textvariable=time_var, width=30, state="readonly")
+        time_entry.grid(row=2, column=1, sticky="we", pady=5)
         frame.columnconfigure(1, weight=1)
         operator_entry.focus_set()
 
@@ -2660,33 +2691,33 @@ class QuotationApp:
                 return
             is_admin_login = clean_text(operator_var.get()) == "1" and password_var.get() == "1"
             if password_var.get() != "zlzk.123456789" and not is_admin_login:
-                messagebox.showerror("密码错误", "密码不正确，无法进入研发配置导入模块。", parent=password_window)
+                messagebox.showerror("密码错误", f"密码不正确，无法进入{title}。", parent=password_window)
                 return
             self.research_operator_id = "00796274" if is_admin_login else clean_text(operator_var.get())
             self.research_operation_time = clean_text(time_var.get())
             password_window.destroy()
-            self.show_research_import_window()
+            on_success()
 
         buttons = ttk.Frame(frame)
         buttons.grid(row=3, column=0, columnspan=2, sticky="w", pady=(12, 0))
         ttk.Button(buttons, text="进入", command=verify).pack(side=LEFT)
         ttk.Button(buttons, text="取消", command=password_window.destroy).pack(side=LEFT, padx=(8, 0))
-        for widget in (operator_entry, time_entry, entry):
+        for widget in (operator_entry, entry):
             widget.bind("<Return>", lambda _e: verify())
 
     def show_research_import_window(self):
         window = Toplevel(self.root)
-        window.title("研发配置导入模块")
+        window.title("配置及价格导入模块")
         window.geometry("520x260")
         window.transient(self.root)
         frame = ttk.Frame(window, padding=16)
         frame.pack(fill=BOTH, expand=True)
-        ttk.Label(frame, text="研发配置导入模块", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(0, 10))
+        ttk.Label(frame, text="配置及价格导入模块", font=("Microsoft YaHei UI", 13, "bold")).pack(anchor="w", pady=(0, 10))
         ttk.Label(frame, text=f"当前工号：{self.research_operator_id}    记录时间：{self.research_operation_time}", foreground="#555").pack(anchor="w", pady=(0, 8))
         ttk.Label(frame, text="以下功能用于维护软件内置数据库，请谨慎操作。", foreground="#555").pack(anchor="w", pady=(0, 12))
         ttk.Button(frame, text="导入增减配价格表", command=self.on_import_price).pack(fill="x", pady=4)
         ttk.Button(frame, text="导入产品安装参数表", command=self.on_import_product_cfg).pack(fill="x", pady=4)
-        ttk.Button(frame, text="导入当前机型配置表", command=self.on_import_tower_config).pack(fill="x", pady=4)
+        ttk.Button(frame, text="导入机型配置表", command=self.on_import_tower_config).pack(fill="x", pady=4)
         ttk.Button(frame, text="删除机型配置表", command=self.on_delete_tower_config).pack(fill="x", pady=4)
 
     def record_change(self, content):
@@ -2741,17 +2772,12 @@ class QuotationApp:
             if not path:
                 return
             try:
-                file_model = infer_model_from_config_filename(path, products)
-                auto_matched = bool(file_model and file_model != model_name)
-                if file_model:
-                    model_name = file_model
                 model, count, old_sources = import_tower_config_file(path, model_name=model_name)
                 action = "覆盖旧配置表" if old_sources else "新增配置表"
                 old_text = f"；旧文件：{'、'.join(old_sources)}" if old_sources else ""
-                match_text = "；按文件名自动匹配机型" if auto_matched else ""
-                self.record_change(f"导入当前机型配置表：{model}；{action}{match_text}；新文件：{Path(path).name}；主要部件 {count} 条{old_text}。")
+                self.record_change(f"导入机型配置表：{model}；{action}；新文件：{Path(path).name}；主要部件 {count} 条；发布状态：待发布{old_text}。")
                 self.reload_db()
-                messagebox.showinfo("导入完成", f"已将配置表导入到 {model}，共 {count} 条主要部件配置。{action}{match_text}。")
+                messagebox.showinfo("导入完成", f"已将配置表导入到 {model}，共 {count} 条主要部件配置。{action}，当前发布状态为待发布。")
             except Exception as exc:
                 messagebox.showerror("导入失败", str(exc))
 
@@ -2807,44 +2833,38 @@ class QuotationApp:
         ttk.Button(buttons, text="删除", command=delete_selected).pack(side=LEFT)
         ttk.Button(buttons, text="取消", command=dialog.destroy).pack(side=LEFT, padx=(8, 0))
 
-    def show_config_status(self):
+    def show_audit_publish_window(self):
+        self.db = load_database()
         products = {
             model: product
             for model, product in self.db.get("products", {}).items()
             if is_visible_product_model(model)
         }
-        configs = self.db.get("components_by_model", {})
         if not products:
-            messagebox.showinfo("配置表导入状态", "请先导入增减配价格表，系统识别到产品型号后再查看状态。")
+            messagebox.showinfo("审核并发布", "请先导入增减配价格表，系统识别到产品型号后再审核发布。")
             return
 
         window = Toplevel(self.root)
-        window.title("机型配置表导入状态")
-        window.geometry("1040x460")
+        window.title("审核并发布")
+        window.geometry("1160x500")
         wrapper = ttk.Frame(window, padding=10)
         wrapper.pack(fill=BOTH, expand=True)
-        imported_count = sum(
-            1
-            for model_name in products
-            if any(cfg.get("model_key") == normalize_key(model_name) for cfg in configs.values())
-        )
+
+        summary_var = StringVar()
+        ttk.Label(wrapper, textvariable=summary_var, font=("Microsoft YaHei UI", 10, "bold")).pack(anchor="w")
         ttk.Label(
             wrapper,
-            text=f"配置表导入状态：共 {len(products)} 个机型，已导入 {imported_count} 个，未导入 {len(products) - imported_count} 个。",
-            font=("Microsoft YaHei UI", 10, "bold"),
-        ).pack(anchor="w")
-        ttk.Label(
-            wrapper,
-            text="说明：配置表按产品型号严格匹配。例如 R220-10 的配置表不会用于 R220-10RA(CE)。",
+            text="说明：导入或覆盖机型配置表后，该机型状态会变为待发布；审核确认后点击发布。",
             foreground="#555",
         ).pack(anchor="w", pady=(0, 8))
 
-        columns = ("model", "code", "status", "source", "forms", "components")
+        columns = ("model", "code", "config_status", "publish_status", "source", "forms", "components")
         tree = ttk.Treeview(wrapper, columns=columns, show="headings", height=14)
         headings = {
             "model": "产品型号",
             "code": "产品编码",
-            "status": "配置表状态",
+            "config_status": "配置表状态",
+            "publish_status": "发布状态",
             "source": "导入文件",
             "forms": "匹配安装形式",
             "components": "可见主要部件",
@@ -2852,62 +2872,125 @@ class QuotationApp:
         widths = {
             "model": 170,
             "code": 100,
-            "status": 110,
+            "config_status": 100,
+            "publish_status": 100,
             "source": 220,
-            "forms": 200,
+            "forms": 230,
             "components": 110,
         }
         for col in columns:
             tree.heading(col, text=headings[col])
             tree.column(col, width=widths[col], anchor="w")
 
-        cfg_by_key = {cfg.get("model_key"): cfg for cfg in configs.values()}
-        for model_name in sorted(products):
-            product = products[model_name]
-            cfg = cfg_by_key.get(normalize_key(model_name))
-            forms = self.db.get("forms_by_code", {}).get(product.get("product_code", ""), [])
-            if cfg:
-                cfg_forms = cfg.get("forms", {})
-                matched_forms = [
-                    form.get("install_form", "")
-                    for form in forms
-                    if normalize_form(form.get("install_form", "")) in cfg_forms
-                ]
-                visible_count = sum(
-                    len([
-                        item
-                        for item in cfg_forms.get(normalize_form(form.get("install_form", "")), [])
-                        if not should_skip_component(" ".join([item.get("component_zh", ""), item.get("part_name", ""), item.get("code", "")]))
-                    ])
-                    for form in forms
-                )
-                status = "已导入"
-                source = cfg.get("source_file", "")
-                forms_text = "、".join(matched_forms) if matched_forms else "无匹配安装形式"
-                components_text = str(visible_count)
-            else:
-                status = "未导入"
-                source = ""
-                forms_text = ""
-                components_text = "0"
-            tree.insert("", "end", values=(model_name, product.get("product_code", ""), status, source, forms_text, components_text))
-
-        scrollbar = ttk.Scrollbar(wrapper, orient=VERTICAL, command=tree.yview)
+        table_frame = ttk.Frame(wrapper)
+        table_frame.pack(fill=BOTH, expand=True)
+        scrollbar = ttk.Scrollbar(table_frame, orient=VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         tree.pack(side=LEFT, fill=BOTH, expand=True)
         scrollbar.pack(side=RIGHT, fill="y")
+
+        def populate():
+            self.db = load_database()
+            tree.delete(*tree.get_children())
+            configs = self.db.get("components_by_model", {})
+            cfg_by_key = {cfg.get("model_key"): cfg for cfg in configs.values()}
+            imported_count = 0
+            published_count = 0
+            pending_count = 0
+            for model_name in sorted(products):
+                product = products[model_name]
+                cfg = cfg_by_key.get(normalize_key(model_name))
+                forms = self.db.get("forms_by_code", {}).get(product.get("product_code", ""), [])
+                if cfg:
+                    imported_count += 1
+                    cfg_forms = cfg.get("forms", {})
+                    matched_forms = [
+                        form.get("install_form", "")
+                        for form in forms
+                        if normalize_form(form.get("install_form", "")) in cfg_forms
+                    ]
+                    visible_count = sum(
+                        len([
+                            item
+                            for item in cfg_forms.get(normalize_form(form.get("install_form", "")), [])
+                            if not should_skip_component(" ".join([item.get("component_zh", ""), item.get("part_name", ""), item.get("code", "")]))
+                        ])
+                        for form in forms
+                    )
+                    config_status = "已导入"
+                    publish_status = "已发布" if is_config_published(self.db, model_name) else "待发布"
+                    if publish_status == "已发布":
+                        published_count += 1
+                    else:
+                        pending_count += 1
+                    source = cfg.get("source_file", "")
+                    forms_text = "、".join(matched_forms) if matched_forms else "无匹配安装形式"
+                    components_text = str(visible_count)
+                else:
+                    config_status = "未导入"
+                    publish_status = "未发布"
+                    source = ""
+                    forms_text = ""
+                    components_text = "0"
+                tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        model_name,
+                        product.get("product_code", ""),
+                        config_status,
+                        publish_status,
+                        source,
+                        forms_text,
+                        components_text,
+                    ),
+                )
+            summary_var.set(
+                f"审核并发布：共 {len(products)} 个机型，已导入 {imported_count} 个，待发布 {pending_count} 个，已发布 {published_count} 个。"
+            )
+
+        def publish_selected():
+            selection = tree.selection()
+            if not selection:
+                messagebox.showinfo("未选择机型", "请先选择要发布的机型。", parent=window)
+                return
+            values = tree.item(selection[0], "values")
+            model_name = values[0]
+            config_status = values[2]
+            publish_status = values[3]
+            source = values[4]
+            if config_status != "已导入":
+                messagebox.showwarning("不能发布", f"{model_name} 尚未导入配置表。", parent=window)
+                return
+            if publish_status == "已发布":
+                messagebox.showinfo("已发布", f"{model_name} 已经是发布状态。", parent=window)
+                return
+            try:
+                publish_tower_config(model_name)
+                self.record_change(f"发布机型配置表：{model_name}；导入文件：{source}。")
+                populate()
+                self.reload_db()
+                messagebox.showinfo("发布完成", f"{model_name} 已发布。", parent=window)
+            except Exception as exc:
+                messagebox.showerror("发布失败", str(exc), parent=window)
+
+        button_bar = ttk.Frame(wrapper)
+        button_bar.pack(fill="x", pady=(10, 0))
+        ttk.Button(button_bar, text="发布选中机型", command=publish_selected).pack(side=LEFT)
+        ttk.Button(button_bar, text="关闭", command=window.destroy).pack(side=LEFT, padx=(8, 0))
+        populate()
 
     def show_change_log(self):
         self.db = load_database()
         logs = self.db.get("change_log", [])
         window = Toplevel(self.root)
-        window.title("配置导入修改记录")
+        window.title("后台数据变更记录")
         window.geometry("980x460")
         wrapper = ttk.Frame(window, padding=10)
         wrapper.pack(fill=BOTH, expand=True)
         ttk.Label(
             wrapper,
-            text=f"配置导入修改记录：共 {len(logs)} 条。",
+            text=f"后台数据变更记录：共 {len(logs)} 条。",
             font=("Microsoft YaHei UI", 10, "bold"),
         ).pack(anchor="w", pady=(0, 8))
 
