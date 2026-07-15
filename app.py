@@ -2269,7 +2269,6 @@ class QuotationApp:
             ("max_load", "最大起重量"),
             ("rope_capacity", "容绳量"),
             ("mast_type", "塔身种类"),
-            ("component_count", "配置表主要部件"),
         ]
         for idx, (key, label_text) in enumerate(info_items):
             row = idx // 2
@@ -2495,7 +2494,6 @@ class QuotationApp:
             "max_load": product.get("max_load", ""),
             "rope_capacity": mm_value(form.get("rope_capacity")),
             "mast_type": product.get("mast_type", ""),
-            "component_count": f"{len(select_components(self.db, self.model_var.get(), self.form_var.get()))} 条",
         }
         for key, value in values.items():
             self.info_value_labels[key].config(text=value)
