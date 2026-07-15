@@ -2757,7 +2757,6 @@ class QuotationApp:
         ttk.Button(frame, text="导入增减配价格表", command=self.on_import_price).pack(fill="x", pady=4)
         ttk.Button(frame, text="导入产品安装参数表", command=self.on_import_product_cfg).pack(fill="x", pady=4)
         ttk.Button(frame, text="导入机型配置表", command=self.on_import_tower_config).pack(fill="x", pady=4)
-        ttk.Button(frame, text="删除机型配置表", command=self.on_delete_tower_config).pack(fill="x", pady=4)
 
     def record_change(self, content):
         append_change_log(self.research_operator_id, self.research_operation_time, content)
