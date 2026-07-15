@@ -349,6 +349,7 @@ def default_database():
         "config_exports_by_model": {},
         "deleted_config_model_keys": [],
         "published_config_model_keys": [],
+        "rejected_config_model_keys": [],
         "options_by_code": {},
         "change_log": [],
         "config_data_reset_version": CONFIG_DATA_RESET_VERSION,
@@ -362,6 +363,7 @@ def apply_database_migrations(db, reset_config_data=False):
         db["config_exports_by_model"] = {}
         db["deleted_config_model_keys"] = []
         db["published_config_model_keys"] = []
+        db["rejected_config_model_keys"] = []
         db["config_data_reset_version"] = CONFIG_DATA_RESET_VERSION
         changed = True
     return changed
@@ -1078,6 +1080,9 @@ def import_tower_config_file(path, model_name=None):
     published_keys = {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
     published_keys.discard(model_key)
     db["published_config_model_keys"] = sorted(published_keys)
+    rejected_keys = {normalize_key(key) for key in db.get("rejected_config_model_keys", []) if clean_text(key)}
+    rejected_keys.discard(model_key)
+    db["rejected_config_model_keys"] = sorted(rejected_keys)
     old_sources = []
     for key, cfg in list(db["components_by_model"].items()):
         if cfg.get("model_key") == model_key or normalize_key(key) == model_key:
@@ -1130,6 +1135,9 @@ def delete_tower_config(model_name):
         published_keys = {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
         published_keys.discard(model_key)
         db["published_config_model_keys"] = sorted(published_keys)
+        rejected_keys = {normalize_key(key) for key in db.get("rejected_config_model_keys", []) if clean_text(key)}
+        rejected_keys.discard(model_key)
+        db["rejected_config_model_keys"] = sorted(rejected_keys)
         save_database(db)
     return sorted(set(removed_sources)), sorted(removed_forms)
 
@@ -1139,17 +1147,41 @@ def is_config_published(db, model_name):
     return model_key in {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
 
 
+def is_config_rejected(db, model_name):
+    model_key = normalize_key(model_name)
+    return model_key in {normalize_key(key) for key in db.get("rejected_config_model_keys", []) if clean_text(key)}
+
+
 def publish_tower_config(model_name):
     db = load_database()
     if not has_imported_config(db, model_name):
         raise ValueError(f"{model_name} 尚未导入配置表，不能发布。")
+    if is_config_rejected(db, model_name):
+        raise ValueError(f"{model_name} 已被拒绝发布，请重新导入配置表后再审核发布。")
     model_key = normalize_key(model_name)
     published_keys = {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
     was_pending = model_key not in published_keys
     published_keys.add(model_key)
     db["published_config_model_keys"] = sorted(published_keys)
+    rejected_keys = {normalize_key(key) for key in db.get("rejected_config_model_keys", []) if clean_text(key)}
+    rejected_keys.discard(model_key)
+    db["rejected_config_model_keys"] = sorted(rejected_keys)
     save_database(db)
     return was_pending
+
+
+def reject_tower_config(model_name):
+    db = load_database()
+    if not has_imported_config(db, model_name):
+        raise ValueError(f"{model_name} 尚未导入配置表，不能拒绝发布。")
+    model_key = normalize_key(model_name)
+    published_keys = {normalize_key(key) for key in db.get("published_config_model_keys", []) if clean_text(key)}
+    published_keys.discard(model_key)
+    rejected_keys = {normalize_key(key) for key in db.get("rejected_config_model_keys", []) if clean_text(key)}
+    rejected_keys.add(model_key)
+    db["published_config_model_keys"] = sorted(published_keys)
+    db["rejected_config_model_keys"] = sorted(rejected_keys)
+    save_database(db)
 
 
 def register_fonts():
@@ -2904,11 +2936,13 @@ class QuotationApp:
             pending_count = 0
             def status_sort_key(model_name):
                 cfg = cfg_by_key.get(normalize_key(model_name))
-                if cfg and not is_config_published(self.db, model_name):
+                if cfg and not is_config_published(self.db, model_name) and not is_config_rejected(self.db, model_name):
                     return (0, model_name)
-                if cfg:
+                if cfg and is_config_rejected(self.db, model_name):
                     return (1, model_name)
-                return (2, model_name)
+                if cfg:
+                    return (2, model_name)
+                return (3, model_name)
 
             for model_name in sorted(products, key=status_sort_key):
                 product = products[model_name]
@@ -2923,10 +2957,15 @@ class QuotationApp:
                         if normalize_form(form.get("install_form", "")) in cfg_forms
                     ]
                     config_status = "已导入"
-                    publish_status = "已发布" if is_config_published(self.db, model_name) else "待发布"
+                    if is_config_published(self.db, model_name):
+                        publish_status = "已发布"
+                    elif is_config_rejected(self.db, model_name):
+                        publish_status = "已拒绝"
+                    else:
+                        publish_status = "待发布"
                     if publish_status == "已发布":
                         published_count += 1
-                    else:
+                    elif publish_status == "待发布":
                         pending_count += 1
                     source = cfg.get("source_file", "")
                     forms_text = "、".join(matched_forms) if matched_forms else "无匹配安装形式"
@@ -2967,6 +3006,9 @@ class QuotationApp:
             if publish_status == "已发布":
                 messagebox.showinfo("已发布", f"{model_name} 已经是发布状态。", parent=window)
                 return
+            if publish_status == "已拒绝":
+                messagebox.showwarning("不能发布", f"{model_name} 已被拒绝发布，请重新导入配置表后再审核发布。", parent=window)
+                return
             try:
                 publish_tower_config(model_name)
                 self.record_change(f"发布机型配置表：{model_name}；导入文件：{source}。")
@@ -2976,9 +3018,40 @@ class QuotationApp:
             except Exception as exc:
                 messagebox.showerror("发布失败", str(exc), parent=window)
 
+        def reject_selected():
+            selection = tree.selection()
+            if not selection:
+                messagebox.showinfo("未选择机型", "请先选择要拒绝发布的机型。", parent=window)
+                return
+            values = tree.item(selection[0], "values")
+            model_name = values[0]
+            config_status = values[2]
+            publish_status = values[3]
+            source = values[4]
+            if config_status != "已导入":
+                messagebox.showwarning("不能拒绝", f"{model_name} 尚未导入配置表。", parent=window)
+                return
+            if publish_status == "已发布":
+                messagebox.showwarning("不能拒绝", f"{model_name} 已发布，如需更改请重新导入配置表覆盖后再审核。", parent=window)
+                return
+            if publish_status == "已拒绝":
+                messagebox.showinfo("已拒绝", f"{model_name} 已经是拒绝状态。", parent=window)
+                return
+            if not messagebox.askyesno("确认拒绝发布", f"确认拒绝发布 {model_name} 吗？拒绝后需要重新导入配置表才能再次审核发布。", parent=window):
+                return
+            try:
+                reject_tower_config(model_name)
+                self.record_change(f"拒绝发布机型配置表：{model_name}；导入文件：{source}；需重新导入配置表后再审核发布。")
+                populate()
+                self.reload_db()
+                messagebox.showinfo("已拒绝发布", f"{model_name} 已拒绝发布，请重新导入配置表后再审核。", parent=window)
+            except Exception as exc:
+                messagebox.showerror("拒绝失败", str(exc), parent=window)
+
         button_bar = ttk.Frame(wrapper)
         button_bar.pack(fill="x", pady=(10, 0))
         ttk.Button(button_bar, text="发布选中机型", command=publish_selected).pack(side=LEFT)
+        ttk.Button(button_bar, text="拒绝发布", command=reject_selected).pack(side=LEFT, padx=(8, 0))
         ttk.Button(button_bar, text="关闭", command=window.destroy).pack(side=LEFT, padx=(8, 0))
         populate()
 
